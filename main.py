@@ -7,9 +7,13 @@ import glm
 from camera import Camera
 from mesh import Mesh
 from shader import Shader
+from framebuffer import Framebuffer
 
 # Instancja kamery
 camera = Camera(glm.vec3(0.0, 2.0, 8.0))
+
+WINDOW_WIDTH = 1600
+WINDOW_HEIGHT = 900
 
 # Callback dla ruchu myszy
 def mouse_callback(window, xpos, ypos):
@@ -23,7 +27,7 @@ def main():
     glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
     glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
 
-    window = glfw.create_window(1600, 900, "Rendering Wody - Faza 1", None, None)
+    window = glfw.create_window(WINDOW_WIDTH, WINDOW_HEIGHT, "Rendering Wody - Faza 1", None, None)
     if not window:
         glfw.terminate()
         raise Exception("GLFW error")
@@ -83,6 +87,9 @@ def main():
 
     last_frame_time = time.time()
 
+    reflection_fbo = Framebuffer(WINDOW_WIDTH, WINDOW_HEIGHT)
+    refraction_fbo = Framebuffer(WINDOW_WIDTH, WINDOW_HEIGHT)
+
     # Pętla główna
     while not glfw.window_should_close(window):
         current_time = time.time()
@@ -110,6 +117,16 @@ def main():
         shader.set_mat4("projection", projection)
         shader.set_mat4("view", view)
 
+        # --- TEST FBO ---
+        reflection_fbo.bind()
+        print(f"Reflection Color Texture ID: {reflection_fbo.color_texture}")
+        print(f"Refraction Color Texture ID: {refraction_fbo.color_texture}")
+        print(f"Reflection Depth RBO ID: {reflection_fbo.depth_rbo}")
+        print(f"Refraction Depth RBO ID: {refraction_fbo.depth_rbo}")
+        # Tutaj rysowanie trafia do pamięci (do tekstury FBO)
+        reflection_fbo.unbind(WINDOW_WIDTH, WINDOW_HEIGHT)
+        # Tutaj rysowanie wraca na ekran
+
         # 1. Rysowanie dna stawu
         model = glm.mat4(1.0)
         shader.set_mat4("model", model)
@@ -128,6 +145,8 @@ def main():
         glfw.swap_buffers(window)
         glfw.poll_events()
 
+    reflection_fbo.clean_up()
+    refraction_fbo.clean_up()
     glfw.terminate()
 
 if __name__ == "__main__":
