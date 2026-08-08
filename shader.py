@@ -4,9 +4,9 @@ import glm
 class Shader:
     def __init__(self, vertex_path, fragment_path):
         # 1. Odczyt kodu shaderów z plików
-        with open(vertex_path, 'r') as f:
+        with open(vertex_path, 'r', encoding='utf-8') as f:
             vertex_code = f.read()
-        with open(fragment_path, 'r') as f:
+        with open(fragment_path, 'r', encoding='utf-8') as f:
             fragment_code = f.read()
 
         # 2. Kompilacja Vertex Shadera
@@ -41,3 +41,7 @@ class Shader:
     def set_mat4(self, name, value):
         loc = glGetUniformLocation(self.program, name)
         glUniformMatrix4fv(loc, 1, GL_FALSE, glm.value_ptr(value))
+
+    def set_vec4(self, name: str, vector):
+        location = glGetUniformLocation(self.program, name)
+        glUniform4f(location, vector.x, vector.y, vector.z, vector.w)

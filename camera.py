@@ -19,6 +19,23 @@ class Camera:
     def get_view_matrix(self):
         return glm.lookAt(self.position, self.position + self.front, self.up)
 
+    def get_reflection_view_matrix(self):
+        # 1. Odwracamy pozycję Y kamery
+        reflection_position = glm.vec3(self.position.x, -self.position.y, self.position.z)
+        
+        # 2. Odwracamy kąt Pitch (spoglądanie w górę/dół)
+        yaw_rad = glm.radians(self.yaw)
+        pitch_rad = glm.radians(-self.pitch)
+        
+        front = glm.vec3()
+        front.x = glm.cos(yaw_rad) * glm.cos(pitch_rad)
+        front.y = glm.sin(pitch_rad)
+        front.z = glm.sin(yaw_rad) * glm.cos(pitch_rad)
+        reflection_front = glm.normalize(front)
+        
+        # 3. Zwracamy odwróconą macierz
+        return glm.lookAt(reflection_position, reflection_position + reflection_front, self.up)
+
     def process_keyboard(self, window, delta_time):
         velocity = self.speed * delta_time
         if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
