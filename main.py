@@ -2,6 +2,7 @@ import glfw
 from OpenGL.GL import *
 import time
 import glm
+from terrain import Terrain
 
 from camera import Camera
 from mesh import Mesh
@@ -17,13 +18,11 @@ WINDOW_HEIGHT = 900
 def mouse_callback(window, xpos, ypos):
     camera.process_mouse(xpos, ypos)
 
-def render_scene(shader, floor_mesh, cube_mesh):
-    # 1. Rysowanie dna stawu
+def render_scene(shader, terrain, cube_mesh):
     model = glm.mat4(1.0)
     shader.set_mat4("model", model)
-    floor_mesh.draw()
+    terrain.draw()  # Rysujemy trójwymiarowy teren zamiast płaskiego kwadratu
 
-    # 2. Rysowanie sześcianu
     model = glm.translate(glm.mat4(1.0), glm.vec3(0.0, 0.0, 0.0))
     shader.set_mat4("model", model)
     cube_mesh.draw()
@@ -52,23 +51,15 @@ def main():
     shader = Shader("shaders/vertex.glsl", "shaders/basic.frag")
 
     # 2. Geometria
-    floor_vertices = [
-        -20.0, -2.0, -20.0,   0.2, 0.2, 0.2,
-         20.0, -2.0, -20.0,   0.2, 0.2, 0.2,
-         20.0, -2.0,  20.0,   0.2, 0.2, 0.2,
-        -20.0, -2.0, -20.0,   0.2, 0.2, 0.2,
-         20.0, -2.0,  20.0,   0.2, 0.2, 0.2,
-        -20.0, -2.0,  20.0,   0.2, 0.2, 0.2,
-    ]
-    floor_mesh = Mesh(floor_vertices)
+    terrain = Terrain("textures/heightmap.png", size=40.0, max_height=4.0, min_height=-1.5)
 
     water_vertices = [
-        -10.0, 0.0, -10.0,   0.0, 0.4, 0.8,
-         10.0, 0.0, -10.0,   0.0, 0.4, 0.8,
-         10.0, 0.0,  10.0,   0.0, 0.4, 0.8,
-        -10.0, 0.0, -10.0,   0.0, 0.4, 0.8,
-         10.0, 0.0,  10.0,   0.0, 0.4, 0.8,
-        -10.0, 0.0,  10.0,   0.0, 0.4, 0.8,
+        -20.0, 0.0, -20.0,   0.0, 0.4, 0.8,
+        20.0, 0.0, -20.0,   0.0, 0.4, 0.8,
+        20.0, 0.0,  20.0,   0.0, 0.4, 0.8,
+        -20.0, 0.0, -20.0,   0.0, 0.4, 0.8,
+        20.0, 0.0,  20.0,   0.0, 0.4, 0.8,
+        -20.0, 0.0,  20.0,   0.0, 0.4, 0.8,
     ]
     water_mesh = Mesh(water_vertices)
 
@@ -122,7 +113,7 @@ def main():
         shader.set_mat4("view", view_reflection)
         shader.set_vec4("plane", glm.vec4(0.0, 1.0, 0.0, 0.0))
 
-        render_scene(shader, floor_mesh, cube_mesh)
+        render_scene(shader, terrain, cube_mesh)
 
         # =========================================================
         # PASS 2: Renderowanie Załamania (Refraction Pass -> FBO)
@@ -136,7 +127,7 @@ def main():
         shader.set_mat4("view", view_normal)
         shader.set_vec4("plane", glm.vec4(0.0, -1.0, 0.0, 0.0))
 
-        render_scene(shader, floor_mesh, cube_mesh)
+        render_scene(shader, terrain, cube_mesh)
 
         # =========================================================
         # PASS 3: Renderowanie na EKRAN (Default Framebuffer)
@@ -150,7 +141,7 @@ def main():
         shader.set_vec4("plane", glm.vec4(0.0, 0.0, 0.0, 0.0))
 
         # Rysujemy pełny świat
-        render_scene(shader, floor_mesh, cube_mesh)
+        render_scene(shader, terrain, cube_mesh)
 
         # Rysujemy taflę wody
         model = glm.mat4(1.0)
