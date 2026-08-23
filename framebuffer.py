@@ -35,19 +35,17 @@ class Framebuffer:
             GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.color_texture, 0
         )
 
-        # Wygenerowanie i aktywacja Renderbuffera
-        self.depth_rbo = glGenRenderbuffers(1)
-        glBindRenderbuffer(GL_RENDERBUFFER, self.depth_rbo)
-
+        # Wygenerowanie i aktywacja Tekstury Głębokości
+        self.depth_texture = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, self.depth_texture)
+        
         # Alokacja pamięci pod test głębokości
-        glRenderbufferStorage(
-            GL_RENDERBUFFER, GL_DEPTH_COMPONENT, self.width, self.height
-        )
-
-        # Podpięcie Renderbuffera do FBO jako bufor głębokości
-        glFramebufferRenderbuffer(
-            GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, self.depth_rbo
-        )
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, self.width, self.height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, None)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        
+        # Podpięcie Tekstury jako bufor głębokości
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, self.depth_texture, 0)
 
         #Walidacja kompletości FBO ---
         status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
@@ -77,4 +75,4 @@ class Framebuffer:
         """
         glDeleteFramebuffers(1, [self.fbo_id])
         glDeleteTextures(1, [self.color_texture])
-        glDeleteRenderbuffers(1, [self.depth_rbo])
+        glDeleteTextures(1, [self.depth_texture])

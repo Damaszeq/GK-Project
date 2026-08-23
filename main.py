@@ -3,6 +3,20 @@ from OpenGL.GL import *
 import time
 import glm
 from terrain import Terrain
+from PIL import Image
+
+def load_texture(path):
+    img = Image.open(path).convert("RGBA")
+    img_data = img.tobytes("raw", "RGBA", 0, -1)
+    
+    tex_id = glGenTextures(1)
+    glBindTexture(GL_TEXTURE_2D, tex_id)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img.width, img.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
+    return tex_id
 
 from camera import Camera
 from mesh import Mesh
@@ -27,6 +41,40 @@ def render_scene(shader, terrain, cube_mesh):
     shader.set_mat4("model", model)
     cube_mesh.draw()
 
+def render_water(water_shader, water_mesh, projection, view, camera, move_factor, light_color, light_direction, reflection_fbo, refraction_fbo, dudv_texture, normal_texture):
+    water_shader.use()
+    water_shader.set_mat4("projection", projection)
+    water_shader.set_mat4("view", view)
+    water_shader.set_float("moveFactor", move_factor)
+    water_shader.set_vec3("cameraPosition", camera.position)
+    water_shader.set_vec3("lightColor", light_color)
+    water_shader.set_vec3("lightDirection", light_direction)
+    
+    model = glm.mat4(1.0)
+    water_shader.set_mat4("model", model)
+    
+    glActiveTexture(GL_TEXTURE0)
+    glBindTexture(GL_TEXTURE_2D, reflection_fbo.color_texture)
+    
+    glActiveTexture(GL_TEXTURE1)
+    glBindTexture(GL_TEXTURE_2D, refraction_fbo.color_texture)
+    
+    glActiveTexture(GL_TEXTURE2)
+    glBindTexture(GL_TEXTURE_2D, dudv_texture)
+    
+    glActiveTexture(GL_TEXTURE3)
+    glBindTexture(GL_TEXTURE_2D, normal_texture)
+    
+    glActiveTexture(GL_TEXTURE4)
+    glBindTexture(GL_TEXTURE_2D, refraction_fbo.depth_texture)
+    
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+    
+    water_mesh.draw()
+    
+    glDisable(GL_BLEND)
+
 def main():
     if not glfw.init():
         raise Exception("GLFW error")
@@ -49,6 +97,23 @@ def main():
 
     # 1. Wczytanie Shadera
     shader = Shader("shaders/vertex.glsl", "shaders/basic.frag")
+    water_shader = Shader("shaders/water.vert", "shaders/water.frag")
+    
+    water_shader.use()
+    water_shader.set_int("reflectionTexture", 0)
+    water_shader.set_int("refractionTexture", 1)
+    water_shader.set_int("dudvMap", 2)
+    water_shader.set_int("normalMap", 3)
+    water_shader.set_int("depthMap", 4)
+    
+    dudv_texture = load_texture("textures/waterDUDV.png")
+    normal_texture = load_texture("textures/matchingNormalMap.png")
+    
+    # Ustawienia światła
+    light_color = glm.vec3(1.0, 1.0, 1.0)
+    # Światło kierunkowe (Directional Light) wektor skąd pada słońce
+    # Np. słońce świecące z góry i lekko z przodu: wektor (0.0, -1.0, 0.5)
+    light_direction = glm.normalize(glm.vec3(0.0, -1.0, 0.5))
 
     # 2. Geometria
     terrain = Terrain("textures/heightmap.png", size=40.0, max_height=4.0, min_height=-1.5)
@@ -85,12 +150,18 @@ def main():
     refraction_fbo = Framebuffer(WINDOW_WIDTH, WINDOW_HEIGHT)
 
     last_frame_time = time.time()
+    
+    move_factor = 0.0
+    WAVE_SPEED = 0.03
 
     # Pętla główna
     while not glfw.window_should_close(window):
         current_time = time.time()
         delta_time = current_time - last_frame_time
         last_frame_time = current_time
+        
+        move_factor += WAVE_SPEED * delta_time
+        move_factor %= 1.0
 
         if glfw.get_key(window, glfw.KEY_ESCAPE) == glfw.PRESS:
             glfw.set_window_should_close(window, True)
@@ -144,9 +215,11 @@ def main():
         render_scene(shader, terrain, cube_mesh)
 
         # Rysujemy taflę wody
-        model = glm.mat4(1.0)
-        shader.set_mat4("model", model)
-        water_mesh.draw()
+        render_water(
+            water_shader, water_mesh, projection, view_normal, camera,
+            move_factor, light_color, light_direction,
+            reflection_fbo, refraction_fbo, dudv_texture, normal_texture
+        )
 
         glfw.swap_buffers(window)
         glfw.poll_events()
