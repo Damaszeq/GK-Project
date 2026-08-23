@@ -17,6 +17,7 @@ uniform vec3 lightDirection; // Direction FROM light TO surface
 const float waveStrength = 0.02;
 const float near = 0.1;
 const float far = 100.0;
+const float waterMurkinessParam = 0.2;
 
 void main() {
     // 1. Perspective divide to get Normalized Device Coordinates (NDC) in range [-1, 1]
@@ -75,7 +76,7 @@ void main() {
     vec3 specularHighlights = lightColor * specularFactor * 0.6; // reflectivity
     
     // Add a slight blue tint and specular highlight, fade at shore
-    FinalColor = mix(FinalColor, vec4(0.0, 0.3, 0.5, 1.0), 0.2 * clamp(waterDepth / 5.0, 0.0, 1.0)) + vec4(specularHighlights, 0.0) * clamp(waterDepth / 1.0, 0.0, 1.0);
+    FinalColor = mix(FinalColor, vec4(0.0, 0.3, 0.5, 1.0), waterMurkinessParam * clamp(waterDepth / 5.0, 0.0, 1.0)) + vec4(specularHighlights, 0.0) * clamp(waterDepth / 1.0, 0.0, 1.0);
     
     // Soft edges: fade water alpha at shore
     FinalColor.a = clamp(waterDepth / 2.0, 0.0, 1.0);
