@@ -46,6 +46,14 @@ class Shader:
         location = glGetUniformLocation(self.program, name)
         glUniform3f(location, vector.x, vector.y, vector.z)
 
+    def set_vec3_array(self, name: str, array):
+        # Oczekujemy listy trójek, np. [(x, y, z), (x, y, z)]
+        import ctypes
+        flat_array = [val for vec in array for val in vec]
+        c_array = (ctypes.c_float * len(flat_array))(*flat_array)
+        location = glGetUniformLocation(self.program, name)
+        glUniform3fv(location, len(array), c_array)
+
     def set_vec4(self, name: str, vector):
         location = glGetUniformLocation(self.program, name)
         glUniform4f(location, vector.x, vector.y, vector.z, vector.w)

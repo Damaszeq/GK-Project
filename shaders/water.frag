@@ -5,6 +5,8 @@ in vec2 textureCoords;
 in vec3 toCameraVector;
 out vec4 FinalColor;
 
+in vec3 worldPosFrag;
+
 uniform sampler2D reflectionTexture;
 uniform sampler2D refractionTexture;
 uniform sampler2D dudvMap;
@@ -13,8 +15,10 @@ uniform sampler2D depthMap;
 uniform float moveFactor;
 uniform vec3 lightColor;
 uniform vec3 lightDirection;
+uniform float appTime;
+uniform sampler2D rippleMap;
 
-const float waveStrength = 0.015;
+const float waveStrength = 0.008;
 const float near = 0.1;
 const float far = 100.0;
 
@@ -39,7 +43,23 @@ void main() {
 
     vec2 distortion1 = (texture(dudvMap, distCoord1).rg * 2.0 - 1.0) * waveStrength;
     vec2 distortion2 = (texture(dudvMap, distCoord2).rg * 2.0 - 1.0) * waveStrength;
-    vec2 totalDistortion = (distortion1 + distortion2) * clamp(waterDepth / 2.0, 0.0, 1.0);
+    // Procedural Ripples from Ripple Map
+    vec2 ripTex = vec2(worldPosFrag.x / 40.0 + 0.5, worldPosFrag.z / 40.0 + 0.5);
+    
+    float texel = 1.0 / 512.0;
+    float rL = texture(rippleMap, ripTex - vec2(texel, 0.0)).r;
+    float rR = texture(rippleMap, ripTex + vec2(texel, 0.0)).r;
+    float rU = texture(rippleMap, ripTex + vec2(0.0, texel)).r;
+    float rD = texture(rippleMap, ripTex - vec2(0.0, texel)).r;
+    
+    // Siła rippli (zwiększona do 5.0 by mocniej zaginać wodę)
+    float ripX = (rL - rR) * 5.0;
+    float ripZ = (rD - rU) * 5.0;
+    
+    vec3 rippleNormal = vec3(ripX, 0.0, ripZ);
+    vec2 rippleDistortion = vec2(ripX, ripZ) * 0.05;
+
+    vec2 totalDistortion = (distortion1 + distortion2 + rippleDistortion) * clamp(waterDepth / 2.0, 0.0, 1.0);
 
     vec2 refractTexCoords = clamp(texCoords + totalDistortion, 0.001, 0.999);
     vec2 reflectTexCoords = clamp(vec2(texCoords.x, 1.0 - texCoords.y) + totalDistortion, 0.001, 0.999);
@@ -67,9 +87,9 @@ void main() {
 
     vec3 normal = normalize(vec3(
         (normalMap1.r + normalMap2.r) * 2.0 - 2.0,
-        (normalMap1.b + normalMap2.b) * 1.5,
+        (normalMap1.b + normalMap2.b) * 3.0,
         (normalMap1.g + normalMap2.g) * 2.0 - 2.0
-    ));
+    ) + rippleNormal);
 
     vec3 lightVector = normalize(-lightDirection);
     vec3 reflectedLight = reflect(-lightVector, normal);

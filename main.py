@@ -9,6 +9,7 @@ from camera import Camera
 from mesh import Mesh
 from shader import Shader
 from framebuffer import Framebuffer
+from rain import Rain
 
 WINDOW_WIDTH = 1600
 WINDOW_HEIGHT = 900
@@ -47,7 +48,7 @@ def render_scene(shader, terrain, cube_mesh):
     shader.set_mat4("model", model)
     cube_mesh.draw()
 
-def render_water(water_shader, water_mesh, projection, view, camera, move_factor, light_color, light_direction, reflection_fbo, refraction_fbo, dudv_texture, normal_texture):
+def render_water(water_shader, water_mesh, projection, view, camera, move_factor, light_color, light_direction, reflection_fbo, refraction_fbo, dudv_texture, normal_texture, app_time, ripple_fbo):
     water_shader.use()
     water_shader.set_mat4("projection", projection)
     water_shader.set_mat4("view", view)
@@ -55,6 +56,7 @@ def render_water(water_shader, water_mesh, projection, view, camera, move_factor
     water_shader.set_vec3("cameraPosition", camera.position)
     water_shader.set_vec3("lightColor", light_color)
     water_shader.set_vec3("lightDirection", light_direction)
+    water_shader.set_float("appTime", app_time)
     
     model = glm.mat4(1.0)
     water_shader.set_mat4("model", model)
@@ -74,11 +76,38 @@ def render_water(water_shader, water_mesh, projection, view, camera, move_factor
     glActiveTexture(GL_TEXTURE4)
     glBindTexture(GL_TEXTURE_2D, refraction_fbo.depth_texture)
     
+    glActiveTexture(GL_TEXTURE5)
+    glBindTexture(GL_TEXTURE_2D, ripple_fbo.color_texture)
+    
     glEnable(GL_BLEND)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
     
     water_mesh.draw()
     
+    glDisable(GL_BLEND)
+
+def render_rain(rain_shader, rain, projection, view, current_time, plane):
+    rain_shader.use()
+    rain_shader.set_mat4("projection", projection)
+    rain_shader.set_mat4("view", view)
+    
+    # Model na identity - deszcz porusza się w World Space
+    rain_shader.set_mat4("model", glm.mat4(1.0))
+    rain_shader.set_vec4("plane", plane)
+    
+    # Uniformy deszczu
+    rain_shader.set_float("time", current_time)
+    rain_shader.set_float("fallSpeed", 15.0)
+    # Wiatr (np. lekko na boki i w dół o długość kropli)
+    rain_shader.set_vec3("windDirection", glm.vec3(-0.1, -0.6, 0.2))
+    
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+    glDepthMask(GL_FALSE)
+    
+    rain.draw()
+    
+    glDepthMask(GL_TRUE)
     glDisable(GL_BLEND)
 
 def main():
@@ -108,6 +137,11 @@ def main():
     # Shady
     shader = Shader("shaders/vertex.glsl", "shaders/basic.frag")
     water_shader = Shader("shaders/water.vert", "shaders/water.frag")
+    rain_shader = Shader("shaders/rain.vert", "shaders/rain.frag")
+    ripple_shader = Shader("shaders/ripple.vert", "shaders/ripple.frag")
+    
+    # System cząsteczek deszczu - bardzo mała intensywność (lekki deszczyk)
+    rain = Rain(num_drops=800, bounds=(-20, 20, 0, 40, -20, 20))
     
     water_shader.use()
     water_shader.set_int("reflectionTexture", 0)
@@ -115,6 +149,7 @@ def main():
     water_shader.set_int("dudvMap", 2)
     water_shader.set_int("normalMap", 3)
     water_shader.set_int("depthMap", 4)
+    water_shader.set_int("rippleMap", 5)
     
     dudv_texture = load_texture("textures/waterDUDV.png")
     normal_texture = load_texture("textures/matchingNormalMap.png")
@@ -155,10 +190,17 @@ def main():
 
     reflection_fbo = Framebuffer(WINDOW_WIDTH, WINDOW_HEIGHT)
     refraction_fbo = Framebuffer(WINDOW_WIDTH, WINDOW_HEIGHT)
+    ripple_fbo = Framebuffer(512, 512)
 
-    last_frame_time = time.time()
+    start_time = time.time()
+    last_frame_time = start_time
     move_factor = 0.0
     WAVE_SPEED = 0.025
+    
+    import random
+    ripples = [(0.0, 0.0, -10.0)] * 15 # (x, z, start_time)
+    ripple_index = 0
+    last_ripple_time = 0.0
 
     # Jasny błękit nieba do glClearColor
     sky_color = (0.45, 0.68, 0.9, 1.0)
@@ -167,6 +209,7 @@ def main():
         current_time = time.time()
         delta_time = current_time - last_frame_time
         last_frame_time = current_time
+        app_time = current_time - start_time
         
         move_factor += WAVE_SPEED * delta_time
         move_factor %= 1.0
@@ -180,21 +223,45 @@ def main():
         projection = glm.perspective(glm.radians(45.0), WINDOW_WIDTH / WINDOW_HEIGHT, 0.1, 100.0)
         shader.set_mat4("projection", projection)
 
+        # PASS 0: Ripple Map
+        ripple_fbo.bind()
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        
+        glEnable(GL_PROGRAM_POINT_SIZE)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_ONE, GL_ONE) # Additive blending
+        glDepthMask(GL_FALSE)
+        glDisable(GL_DEPTH_TEST)
+        
+        ripple_shader.use()
+        ripple_shader.set_float("time", app_time)
+        ripple_shader.set_float("fallSpeed", 15.0)
+        rain.draw_points()
+        
+        glDisable(GL_PROGRAM_POINT_SIZE)
+        glDisable(GL_BLEND)
+        glDepthMask(GL_TRUE)
+        glEnable(GL_DEPTH_TEST)
+
         # PASS 1: Odbicie (Reflection Pass)
         reflection_fbo.bind()
         glClearColor(*sky_color)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
+        shader.use()
         view_reflection = camera.get_reflection_view_matrix()
         shader.set_mat4("view", view_reflection)
         shader.set_vec4("plane", glm.vec4(0.0, 1.0, 0.0, 0.0))
         render_scene(shader, terrain, cube_mesh)
+        render_rain(rain_shader, rain, projection, view_reflection, app_time, glm.vec4(0.0, 1.0, 0.0, 0.0))
 
         # PASS 2: Załamanie (Refraction Pass)
         refraction_fbo.bind()
         glClearColor(*sky_color)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
+        shader.use()
         view_normal = camera.get_view_matrix()
         shader.set_mat4("view", view_normal)
         shader.set_vec4("plane", glm.vec4(0.0, -1.0, 0.0, 0.0))
@@ -205,6 +272,7 @@ def main():
         glClearColor(*sky_color)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
+        shader.use()
         shader.set_mat4("view", view_normal)
         shader.set_vec4("plane", glm.vec4(0.0, 0.0, 0.0, 0.0))
         render_scene(shader, terrain, cube_mesh)
@@ -212,8 +280,12 @@ def main():
         render_water(
             water_shader, water_mesh, projection, view_normal, camera,
             move_factor, light_color, light_direction,
-            reflection_fbo, refraction_fbo, dudv_texture, normal_texture
+            reflection_fbo, refraction_fbo, dudv_texture, normal_texture,
+            app_time, ripple_fbo
         )
+        
+        # Render rain last, over everything
+        render_rain(rain_shader, rain, projection, view_normal, app_time, glm.vec4(0.0, 0.0, 0.0, 0.0))
 
         glfw.swap_buffers(window)
         glfw.poll_events()

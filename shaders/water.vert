@@ -5,6 +5,7 @@ layout (location = 0) in vec3 aPos;
 out vec4 clipSpace;
 out vec2 textureCoords;
 out vec3 toCameraVector;
+out vec3 worldPosFrag;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -21,5 +22,6 @@ void main()
     textureCoords = vec2(aPos.x / 2.0, aPos.z / 2.0) * tiling;
     
     toCameraVector = cameraPosition - worldPosition.xyz;
+    worldPosFrag = worldPosition.xyz;
 }
 
