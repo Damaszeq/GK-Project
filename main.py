@@ -14,8 +14,7 @@ from rain import Rain
 WINDOW_WIDTH = 1600
 WINDOW_HEIGHT = 900
 
-# Instancja kamery
-camera = Camera(glm.vec3(0.0, 2.0, 8.0))
+camera = Camera(glm.vec3(0.0, 4.0, 15.0))
 
 def load_texture(path):
     img = Image.open(path).convert("RGBA")
@@ -27,7 +26,6 @@ def load_texture(path):
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
     
-    # Filtrowanie trójliniowe (Mipmapping)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
     
@@ -44,7 +42,7 @@ def render_scene(shader, terrain, cube_mesh):
     shader.set_mat4("model", model)
     terrain.draw()
 
-    model = glm.translate(glm.mat4(1.0), glm.vec3(0.0, 0.0, 0.0))
+    model = glm.translate(glm.mat4(1.0), glm.vec3(0.0, 1.0, 0.0))
     shader.set_mat4("model", model)
     cube_mesh.draw()
 
@@ -91,14 +89,11 @@ def render_rain(rain_shader, rain, projection, view, current_time, plane):
     rain_shader.set_mat4("projection", projection)
     rain_shader.set_mat4("view", view)
     
-    # Model na identity - deszcz porusza się w World Space
     rain_shader.set_mat4("model", glm.mat4(1.0))
     rain_shader.set_vec4("plane", plane)
     
-    # Uniformy deszczu
     rain_shader.set_float("time", current_time)
     rain_shader.set_float("fallSpeed", 15.0)
-    # Wiatr (np. lekko na boki i w dół o długość kropli)
     rain_shader.set_vec3("windDirection", glm.vec3(-0.1, -0.6, 0.2))
     
     glEnable(GL_BLEND)
@@ -117,8 +112,6 @@ def main():
     glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
     glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
     glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
-    
-    # Włączenie Wygładzania Krawędzi (4x MSAA)
     glfw.window_hint(glfw.SAMPLES, 4)
 
     window = glfw.create_window(WINDOW_WIDTH, WINDOW_HEIGHT, "Rendering Wody", None, None)
@@ -134,14 +127,16 @@ def main():
     glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_DISABLED)
     glfw.set_cursor_pos_callback(window, mouse_callback)
 
-    # Shady
     shader = Shader("shaders/vertex.glsl", "shaders/basic.frag")
     water_shader = Shader("shaders/water.vert", "shaders/water.frag")
     rain_shader = Shader("shaders/rain.vert", "shaders/rain.frag")
     ripple_shader = Shader("shaders/ripple.vert", "shaders/ripple.frag")
     
-    # System cząsteczek deszczu - bardzo mała intensywność (lekki deszczyk)
-    rain = Rain(num_drops=800, bounds=(-20, 20, 0, 40, -20, 20))
+    # Skalowanie obszaru spawnu deszczu do rozmiaru terenu (SIZE = 60.0, czyli zakresem jest -30 do 30)
+    TERRAIN_SIZE = 60.0
+    HALF_SIZE = TERRAIN_SIZE / 2.0
+
+    rain = Rain(num_drops=1500, bounds=(-HALF_SIZE, HALF_SIZE, 0, 40, -HALF_SIZE, HALF_SIZE))
     
     water_shader.use()
     water_shader.set_int("reflectionTexture", 0)
@@ -154,20 +149,19 @@ def main():
     dudv_texture = load_texture("textures/waterDUDV.png")
     normal_texture = load_texture("textures/matchingNormalMap.png")
     
-    # Jasne oświetlenie
     light_color = glm.vec3(1.0, 0.98, 0.9)
     light_direction = glm.normalize(glm.vec3(0.0, -1.0, 0.5))
 
-    # Geometria
-    terrain = Terrain("textures/heightmap.png", size=40.0, max_height=4.0, min_height=-1.5)
+    # Wymiary terenu: max_height i min_height ustalone tak, by woda schodziła się przy brzegu
+    terrain = Terrain("textures/heightmap.png", size=TERRAIN_SIZE, max_height=8.0, min_height=-0.8)
 
     water_vertices = [
-        -20.0, 0.0, -20.0,  0.0, 0.0, 0.0,
-        -20.0, 0.0,  20.0,  0.0, 0.0, 0.0,
-         20.0, 0.0, -20.0,  0.0, 0.0, 0.0,
-         20.0, 0.0, -20.0,  0.0, 0.0, 0.0,
-        -20.0, 0.0,  20.0,  0.0, 0.0, 0.0,
-         20.0, 0.0,  20.0,  0.0, 0.0, 0.0,
+        -HALF_SIZE, 0.0, -HALF_SIZE,  0.0, 0.0, 0.0,
+        -HALF_SIZE, 0.0,  HALF_SIZE,  0.0, 0.0, 0.0,
+         HALF_SIZE, 0.0, -HALF_SIZE,  0.0, 0.0, 0.0,
+         HALF_SIZE, 0.0, -HALF_SIZE,  0.0, 0.0, 0.0,
+        -HALF_SIZE, 0.0,  HALF_SIZE,  0.0, 0.0, 0.0,
+         HALF_SIZE, 0.0,  HALF_SIZE,  0.0, 0.0, 0.0,
     ]
     water_mesh = Mesh(water_vertices)
 
@@ -196,13 +190,7 @@ def main():
     last_frame_time = start_time
     move_factor = 0.0
     WAVE_SPEED = 0.025
-    
-    import random
-    ripples = [(0.0, 0.0, -10.0)] * 15 # (x, z, start_time)
-    ripple_index = 0
-    last_ripple_time = 0.0
 
-    # Jasny błękit nieba do glClearColor
     sky_color = (0.45, 0.68, 0.9, 1.0)
 
     while not glfw.window_should_close(window):
@@ -230,7 +218,7 @@ def main():
         
         glEnable(GL_PROGRAM_POINT_SIZE)
         glEnable(GL_BLEND)
-        glBlendFunc(GL_ONE, GL_ONE) # Additive blending
+        glBlendFunc(GL_ONE, GL_ONE)
         glDepthMask(GL_FALSE)
         glDisable(GL_DEPTH_TEST)
         
@@ -244,7 +232,7 @@ def main():
         glDepthMask(GL_TRUE)
         glEnable(GL_DEPTH_TEST)
 
-        # PASS 1: Odbicie (Reflection Pass)
+        # PASS 1: Odbicie (Reflection Pass) - mały offset obcinania zapobiega artefaktom
         reflection_fbo.bind()
         glClearColor(*sky_color)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -252,9 +240,9 @@ def main():
         shader.use()
         view_reflection = camera.get_reflection_view_matrix()
         shader.set_mat4("view", view_reflection)
-        shader.set_vec4("plane", glm.vec4(0.0, 1.0, 0.0, 0.0))
+        shader.set_vec4("plane", glm.vec4(0.0, 1.0, 0.0, -0.001))
         render_scene(shader, terrain, cube_mesh)
-        render_rain(rain_shader, rain, projection, view_reflection, app_time, glm.vec4(0.0, 1.0, 0.0, 0.0))
+        render_rain(rain_shader, rain, projection, view_reflection, app_time, glm.vec4(0.0, 1.0, 0.0, -0.001))
 
         # PASS 2: Załamanie (Refraction Pass)
         refraction_fbo.bind()
@@ -264,7 +252,7 @@ def main():
         shader.use()
         view_normal = camera.get_view_matrix()
         shader.set_mat4("view", view_normal)
-        shader.set_vec4("plane", glm.vec4(0.0, -1.0, 0.0, 0.0))
+        shader.set_vec4("plane", glm.vec4(0.0, -1.0, 0.0, 0.001))
         render_scene(shader, terrain, cube_mesh)
 
         # PASS 3: Renderowanie na EKRAN
@@ -284,7 +272,6 @@ def main():
             app_time, ripple_fbo
         )
         
-        # Render rain last, over everything
         render_rain(rain_shader, rain, projection, view_normal, app_time, glm.vec4(0.0, 0.0, 0.0, 0.0))
 
         glfw.swap_buffers(window)
