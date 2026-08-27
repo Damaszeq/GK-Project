@@ -23,8 +23,8 @@ def load_texture(path):
     tex_id = glGenTextures(1)
     glBindTexture(GL_TEXTURE_2D, tex_id)
     
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
     
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
@@ -132,7 +132,6 @@ def main():
     rain_shader = Shader("shaders/rain.vert", "shaders/rain.frag")
     ripple_shader = Shader("shaders/ripple.vert", "shaders/ripple.frag")
     
-    # Skalowanie obszaru spawnu deszczu do rozmiaru terenu (SIZE = 60.0, czyli zakresem jest -30 do 30)
     TERRAIN_SIZE = 60.0
     HALF_SIZE = TERRAIN_SIZE / 2.0
 
@@ -152,7 +151,6 @@ def main():
     light_color = glm.vec3(1.0, 0.98, 0.9)
     light_direction = glm.normalize(glm.vec3(0.0, -1.0, 0.5))
 
-    # Wymiary terenu: max_height i min_height ustalone tak, by woda schodziła się przy brzegu
     terrain = Terrain("textures/heightmap.png", size=TERRAIN_SIZE, max_height=8.0, min_height=-0.8)
 
     water_vertices = [
@@ -189,7 +187,7 @@ def main():
     start_time = time.time()
     last_frame_time = start_time
     move_factor = 0.0
-    WAVE_SPEED = 0.025
+    WAVE_SPEED = 0.08
 
     sky_color = (0.45, 0.68, 0.9, 1.0)
 
@@ -211,9 +209,10 @@ def main():
         projection = glm.perspective(glm.radians(45.0), WINDOW_WIDTH / WINDOW_HEIGHT, 0.1, 100.0)
         shader.set_mat4("projection", projection)
 
-        # PASS 0: Ripple Map
+        # PASS 0: Ripple Map (bufor 512x512)
         ripple_fbo.bind()
-        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glViewport(0, 0, 512, 512)
+        glClearColor(0.48, 0.52, 0.58, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         
         glEnable(GL_PROGRAM_POINT_SIZE)
@@ -232,31 +231,38 @@ def main():
         glDepthMask(GL_TRUE)
         glEnable(GL_DEPTH_TEST)
 
-        # PASS 1: Odbicie (Reflection Pass) - mały offset obcinania zapobiega artefaktom
+# PASS 1: Odbicie (Reflection Pass)
         reflection_fbo.bind()
+        glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
         glClearColor(*sky_color)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         shader.use()
-        view_reflection = camera.get_reflection_view_matrix()
+        # ZACHOWUJEMY GEOMETRIĘ NAD WODĄ (Y >= 0.0)
+        shader.set_vec4("plane", glm.vec4(0.0, 1.0, 0.0, -0.05))
+
+        view_reflection = camera.get_reflection_view_matrix(water_height=0.0)
         shader.set_mat4("view", view_reflection)
-        shader.set_vec4("plane", glm.vec4(0.0, 1.0, 0.0, -0.001))
+
         render_scene(shader, terrain, cube_mesh)
-        render_rain(rain_shader, rain, projection, view_reflection, app_time, glm.vec4(0.0, 1.0, 0.0, -0.001))
+        render_rain(rain_shader, rain, projection, view_reflection, app_time, glm.vec4(0.0, 1.0, 0.0, -0.05))
 
         # PASS 2: Załamanie (Refraction Pass)
         refraction_fbo.bind()
+        glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
         glClearColor(*sky_color)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         shader.use()
         view_normal = camera.get_view_matrix()
         shader.set_mat4("view", view_normal)
-        shader.set_vec4("plane", glm.vec4(0.0, -1.0, 0.0, 0.001))
+        # ZACHOWUJEMY GEOMETRIĘ POD WODĄ (Y <= 0.0)
+        shader.set_vec4("plane", glm.vec4(0.0, -1.0, 0.0, 0.05))
         render_scene(shader, terrain, cube_mesh)
 
         # PASS 3: Renderowanie na EKRAN
         reflection_fbo.unbind(WINDOW_WIDTH, WINDOW_HEIGHT)
+        glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
         glClearColor(*sky_color)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 

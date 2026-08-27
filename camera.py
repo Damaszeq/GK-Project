@@ -19,22 +19,23 @@ class Camera:
     def get_view_matrix(self):
         return glm.lookAt(self.position, self.position + self.front, self.up)
 
-    def get_reflection_view_matrix(self):
-        # 1. Odwracamy pozycję Y kamery
-        reflection_position = glm.vec3(self.position.x, -self.position.y, self.position.z)
+    def get_reflection_view_matrix(self, water_height=0.0):
+        # 1. Odwracamy pozycję kamery względem wysokości wody (2 * water_height - Y)
+        ref_position = glm.vec3(
+            self.position.x,
+            2.0 * water_height - self.position.y,
+            self.position.z
+        )
         
-        # 2. Odwracamy kąt Pitch (spoglądanie w górę/dół)
-        yaw_rad = glm.radians(self.yaw)
-        pitch_rad = glm.radians(-self.pitch)
+        # 2. Odwracamy składową Y kierunku patrzenia
+        ref_front = glm.vec3(
+            self.front.x,
+            -self.front.y,
+            self.front.z
+        )
         
-        front = glm.vec3()
-        front.x = glm.cos(yaw_rad) * glm.cos(pitch_rad)
-        front.y = glm.sin(pitch_rad)
-        front.z = glm.sin(yaw_rad) * glm.cos(pitch_rad)
-        reflection_front = glm.normalize(front)
-        
-        # 3. Zwracamy odwróconą macierz
-        return glm.lookAt(reflection_position, reflection_position + reflection_front, self.up)
+        # 3. Zwracamy macierz odbitą
+        return glm.lookAt(ref_position, ref_position + ref_front, self.up)
 
     def process_keyboard(self, window, delta_time):
         velocity = self.speed * delta_time
@@ -54,18 +55,16 @@ class Camera:
             self.first_mouse = False
 
         xoffset = (xpos - self.last_x) * self.sensitivity
-        yoffset = (self.last_y - ypos) * self.sensitivity # Odwrócona oś Y
+        yoffset = (self.last_y - ypos) * self.sensitivity
         self.last_x = xpos
         self.last_y = ypos
 
         self.yaw += xoffset
         self.pitch += yoffset
 
-        # Ograniczenie patrzenia w górę/dół
         if self.pitch > 89.0: self.pitch = 89.0
         if self.pitch < -89.0: self.pitch = -89.0
 
-        # Aktualizacja wektorów
         front = glm.vec3()
         front.x = glm.cos(glm.radians(self.yaw)) * glm.cos(glm.radians(self.pitch))
         front.y = glm.sin(glm.radians(self.pitch))
