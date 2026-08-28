@@ -19,7 +19,7 @@ uniform vec3 lightColor;
 uniform vec3 lightDirection;
 uniform float appTime;
 
-const float waveStrength = 0.05; // Zmniejszona siła, aby uniknąć rozciągania krawędzi
+const float waveStrength = 0.0; // Płaska woda (lustro)
 const float near = 0.1;
 const float far = 100.0;
 
@@ -81,8 +81,8 @@ void main() {
                              smoothstep(vec2(1.0), vec2(0.88), texCoords);
     float edgeWeight = screenEdgeFactor.x * screenEdgeFactor.y;
 
-    // Używamy texCoords bezpośrednio! Obraz z kamery odbitej jest już poprawnie zorientowany w buforze FBO.
-    vec2 reflectTexCoords = clamp(texCoords + (totalDistortion * edgeWeight), 0.005, 0.995);
+    // Używamy texCoords z odwróconą osią Y, ponieważ kamera odbicia renderuje obraz odwrócony przestrzennie.
+    vec2 reflectTexCoords = clamp(vec2(texCoords.x, 1.0 - texCoords.y) + (totalDistortion * edgeWeight), 0.005, 0.995);
 
     // 6. Próbkowanie buforów
     vec4 reflectColor = texture(reflectionTexture, reflectTexCoords);
@@ -99,15 +99,8 @@ void main() {
 
     vec4 baseColor = mix(reflectColor, depthAdjustedRefract, refractiveFactor);
 
-    // 8. Oświetlenie
-    vec4 normalMap1 = texture(normalMap, distCoord1);
-    vec4 normalMap2 = texture(normalMap, distCoord2);
-
-    vec3 normal = normalize(vec3(
-        (normalMap1.r + normalMap2.r) * 3.5 - 3.5,
-        (normalMap1.b + normalMap2.b) * 1.5,
-        (normalMap1.g + normalMap2.g) * 3.5 - 3.5
-    ) + rippleNormal);
+    // Płaska woda, tylko fale od deszczu
+    vec3 normal = normalize(vec3(0.0, 1.0, 0.0) + rippleNormal);
 
     vec3 lightVector = normalize(-lightDirection);
     vec3 reflectedLight = reflect(-lightVector, normal);
