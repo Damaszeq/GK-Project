@@ -105,6 +105,30 @@ def render_rain(rain_shader, rain, projection, view, current_time, plane):
     glDepthMask(GL_TRUE)
     glDisable(GL_BLEND)
 
+def render_clouds(cloud_shader, cloud_mesh, projection, view, app_time, sky_color, cloud_texture, clip_plane):
+    cloud_shader.use()
+    cloud_shader.set_mat4("projection", projection)
+    cloud_shader.set_mat4("view", view)
+    
+    # Przesuwamy chmury wysoko na niebo (Y = 25.0)
+    model = glm.translate(glm.mat4(1.0), glm.vec3(0.0, 25.0, 0.0))
+    cloud_shader.set_mat4("model", model)
+    
+    # Zabezpieczenie przed ucięciem
+    # Nie ustawiamy zmiennej "plane" w shaderze chmur, ale chmury są zawsze nad wodą (Y=25.0).
+    
+    cloud_shader.set_float("time", app_time)
+    cloud_shader.set_vec3("skyColor", glm.vec3(sky_color[0], sky_color[1], sky_color[2]))
+    
+    glActiveTexture(GL_TEXTURE0)
+    glBindTexture(GL_TEXTURE_2D, cloud_texture)
+    cloud_shader.set_int("cloudTexture", 0)
+    
+    # Disable depth writing so clouds act strictly as a sky background
+    glDepthMask(GL_FALSE)
+    cloud_mesh.draw()
+    glDepthMask(GL_TRUE)
+
 def main():
     if not glfw.init():
         raise Exception("GLFW error")
@@ -131,11 +155,12 @@ def main():
     water_shader = Shader("shaders/water.vert", "shaders/water.frag")
     rain_shader = Shader("shaders/rain.vert", "shaders/rain.frag")
     ripple_shader = Shader("shaders/ripple.vert", "shaders/ripple.frag")
+    cloud_shader = Shader("shaders/cloud.vert", "shaders/cloud.frag")
     
     TERRAIN_SIZE = 60.0
     HALF_SIZE = TERRAIN_SIZE / 2.0
 
-    rain = Rain(num_drops=1500, bounds=(-HALF_SIZE, HALF_SIZE, 0, 40, -HALF_SIZE, HALF_SIZE))
+    rain = Rain(num_drops=5000, bounds=(-HALF_SIZE, HALF_SIZE, 0, 40, -HALF_SIZE, HALF_SIZE))
     
     water_shader.use()
     water_shader.set_int("reflectionTexture", 0)
@@ -147,6 +172,7 @@ def main():
     
     dudv_texture = load_texture("textures/waterDUDV.png")
     normal_texture = load_texture("textures/matchingNormalMap.png")
+    cloud_texture = load_texture("textures/clouds.jpg")
     
     light_color = glm.vec3(1.0, 0.98, 0.9)
     light_direction = glm.normalize(glm.vec3(0.0, -1.0, 0.5))
@@ -179,6 +205,17 @@ def main():
          0.5,  1.0, -0.5,  0.8, 0.1, 0.1,
     ]
     cube_mesh = Mesh(cube_vertices)
+    
+    CLOUD_SIZE = 1000.0
+    cloud_vertices = [
+        -CLOUD_SIZE, 0.0, -CLOUD_SIZE,  1.0, 1.0, 1.0,
+        -CLOUD_SIZE, 0.0,  CLOUD_SIZE,  1.0, 1.0, 1.0,
+         CLOUD_SIZE, 0.0, -CLOUD_SIZE,  1.0, 1.0, 1.0,
+         CLOUD_SIZE, 0.0, -CLOUD_SIZE,  1.0, 1.0, 1.0,
+        -CLOUD_SIZE, 0.0,  CLOUD_SIZE,  1.0, 1.0, 1.0,
+         CLOUD_SIZE, 0.0,  CLOUD_SIZE,  1.0, 1.0, 1.0,
+    ]
+    cloud_mesh = Mesh(cloud_vertices)
 
     reflection_fbo = Framebuffer(WINDOW_WIDTH, WINDOW_HEIGHT)
     refraction_fbo = Framebuffer(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -206,7 +243,7 @@ def main():
         camera.process_keyboard(window, delta_time)
 
         shader.use()
-        projection = glm.perspective(glm.radians(45.0), WINDOW_WIDTH / WINDOW_HEIGHT, 0.1, 100.0)
+        projection = glm.perspective(glm.radians(45.0), WINDOW_WIDTH / WINDOW_HEIGHT, 0.1, 1000.0)
         shader.set_mat4("projection", projection)
 
         # PASS 0: Ripple Map (bufor 512x512)
@@ -237,11 +274,12 @@ def main():
         glClearColor(*sky_color)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
+        view_reflection = camera.get_reflection_view_matrix(water_height=0.0)
+        render_clouds(cloud_shader, cloud_mesh, projection, view_reflection, app_time, sky_color, cloud_texture, glm.vec4(0,1,0,0))
+
         shader.use()
         # ZACHOWUJEMY GEOMETRIĘ NAD WODĄ (Y >= 0.0)
         shader.set_vec4("plane", glm.vec4(0.0, 1.0, 0.0, -0.05))
-
-        view_reflection = camera.get_reflection_view_matrix(water_height=0.0)
         shader.set_mat4("view", view_reflection)
 
         render_scene(shader, terrain, cube_mesh)
@@ -265,6 +303,8 @@ def main():
         glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
         glClearColor(*sky_color)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        render_clouds(cloud_shader, cloud_mesh, projection, view_normal, app_time, sky_color, cloud_texture, glm.vec4(0,1,0,0))
 
         shader.use()
         shader.set_mat4("view", view_normal)

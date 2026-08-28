@@ -102,11 +102,8 @@ void main() {
     // Płaska woda, tylko fale od deszczu
     vec3 normal = normalize(vec3(0.0, 1.0, 0.0) + rippleNormal);
 
-    vec3 lightVector = normalize(-lightDirection);
-    vec3 reflectedLight = reflect(-lightVector, normal);
-    float specularFactor = max(dot(reflectedLight, viewVector), 0.0);
-    specularFactor = pow(specularFactor, 16.0);
-    vec3 specularHighlights = lightColor * specularFactor * 0.9;
+    // Brak bezpośredniego słońca (pochmurny dzień)
+    vec3 specularHighlights = vec3(0.0);
 
     vec3 finalRGB = mix(baseColor.rgb, shallowWaterTint, 0.15) + specularHighlights;
 

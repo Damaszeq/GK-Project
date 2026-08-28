@@ -1,6 +1,6 @@
 #version 330 core
 
-const float rippleSize = 5.0;
+const float rippleSize = 10.0;
 
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in float aOffset;
