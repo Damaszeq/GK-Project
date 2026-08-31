@@ -15,6 +15,7 @@ from model import Model
 
 WINDOW_WIDTH = 1600
 WINDOW_HEIGHT = 900
+SHADOW_WIDTH, SHADOW_HEIGHT = 2048, 2048
 
 camera = Camera(glm.vec3(0.0, 4.0, 15.0))
 
@@ -27,7 +28,6 @@ def load_texture(path):
     
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
-    
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
     
@@ -140,7 +140,7 @@ def main():
     glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
     glfw.window_hint(glfw.SAMPLES, 4)
 
-    window = glfw.create_window(WINDOW_WIDTH, WINDOW_HEIGHT, "Rendering Wody", None, None)
+    window = glfw.create_window(WINDOW_WIDTH, WINDOW_HEIGHT, "Rendering Wody + Cienie", None, None)
     if not window:
         glfw.terminate()
         raise Exception("GLFW error")
@@ -159,7 +159,26 @@ def main():
     ripple_shader = Shader("shaders/ripple.vert", "shaders/ripple.frag")
     cloud_shader = Shader("shaders/cloud.vert", "shaders/cloud.frag")
     model_shader = Shader("shaders/model.vert", "shaders/model.frag")
+    shadow_shader = Shader("shaders/shadow.vert", "shaders/shadow.frag")
     
+    # SHADOW MAP FBO
+    depthMapFBO = glGenFramebuffers(1)
+    depthMap = glGenTextures(1)
+    glBindTexture(GL_TEXTURE_2D, depthMap)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, None)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER)
+    borderColor = [1.0, 1.0, 1.0, 1.0]
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor)
+
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO)
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0)
+    glDrawBuffer(GL_NONE)
+    glReadBuffer(GL_NONE)
+    glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
     rock_model = Model("models/Obj/stone_largeA.obj")
     plant_model = Model("models/Obj/plant_bush.obj")
     plant2_model = Model("models/Obj/plant_flatTall.obj")
@@ -191,7 +210,6 @@ def main():
         
         if terrain_y + scale < -0.1:
             y = terrain_y
-            
             rand_val = random.random()
             if rand_val < 0.20:
                 models_to_draw.append((rock_model, dummy_color, glm.vec3(x, y, z), glm.vec3(scale)))
@@ -237,8 +255,8 @@ def main():
     
     cloud_texture = load_texture("textures/clouds.jpg")
     
-    light_color = glm.vec3(1.0, 0.98, 0.9)
-    light_direction = glm.normalize(glm.vec3(0.0, -1.0, 0.5))
+    light_direction = glm.normalize(glm.vec3(-0.2, -1.0, -0.1))
+    light_color = glm.vec3(0.6, 0.65, 0.7) # Chłodniejsze, szaro-niebieskie światło
 
     water_vertices = [
         -HALF_SIZE, 0.0, -HALF_SIZE,  0.0, 0.0, 0.0,
@@ -281,9 +299,35 @@ def main():
 
         camera.process_keyboard(window, delta_time)
 
+        # Macierz rzutowania światła (Shadow Pass Matrix)
+        lightProjection = glm.ortho(-40.0, 40.0, -40.0, 40.0, 1.0, 75.0)
+        lightView = glm.lookAt(-light_direction * 30.0, glm.vec3(0.0), glm.vec3(0.0, 1.0, 0.0))
+        lightSpaceMatrix = lightProjection * lightView
+
+        # PASS -1: Shadow Map Pass
+        shadow_shader.use()
+        shadow_shader.set_mat4("lightSpaceMatrix", lightSpaceMatrix)
+        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT)
+        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO)
+        glClear(GL_DEPTH_BUFFER_BIT)
+        
+        shadow_shader.set_mat4("model", glm.mat4(1.0))
+        terrain.draw()
+        for obj, color, pos, scale in models_to_draw:
+            mat = glm.translate(glm.mat4(1.0), pos)
+            mat = glm.scale(mat, scale)
+            shadow_shader.set_mat4("model", mat)
+            obj.draw()
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+        # Przekazanie macierzy światła i tekstury cieni do shadera terenu
         shader.use()
         projection = glm.perspective(glm.radians(45.0), WINDOW_WIDTH / WINDOW_HEIGHT, 0.1, 1000.0)
         shader.set_mat4("projection", projection)
+        shader.set_mat4("lightSpaceMatrix", lightSpaceMatrix)
+        glActiveTexture(GL_TEXTURE3)
+        glBindTexture(GL_TEXTURE_2D, depthMap)
+        shader.set_int("shadowMap", 3)
 
         # PASS 0: Ripple Map (bufor 512x512)
         ripple_fbo.bind()
@@ -321,6 +365,7 @@ def main():
         shader.use()
         shader.set_vec4("plane", reflection_plane)
         shader.set_mat4("view", view_reflection)
+        shader.set_vec3("viewPos", camera.position)
 
         render_scene(shader, terrain, sky_color)
         render_models(model_shader, projection, view_reflection, camera, sky_color, light_color, light_direction, reflection_plane, models_to_draw)
@@ -337,6 +382,7 @@ def main():
 
         shader.set_mat4("view", view_normal)
         shader.set_vec4("plane", refraction_plane)
+        shader.set_vec3("viewPos", camera.position)
         
         render_scene(shader, terrain, sky_color)
         render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, refraction_plane, models_to_draw)
@@ -353,7 +399,8 @@ def main():
         shader.use()
         shader.set_mat4("view", view_normal)
         shader.set_vec4("plane", screen_plane)
-        
+        shader.set_vec3("viewPos", camera.position)
+
         render_scene(shader, terrain, sky_color)
         render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, screen_plane, models_to_draw)
 

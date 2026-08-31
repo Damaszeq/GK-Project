@@ -10,6 +10,7 @@ in float Visibility;
 uniform vec3 lightColor;
 uniform vec3 lightDirection;
 uniform vec3 skyColor;
+uniform vec3 cameraPosition; // Potrzebne do obliczenia specularyzacji wody
 
 void main()
 {
@@ -23,8 +24,17 @@ void main()
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
 
-    vec3 baseColor = ObjectColor;
-    vec3 lighting = (ambient + diffuse) * baseColor;
+    // Lekkie przyciemnienie mokrego obiektu
+    vec3 baseColor = ObjectColor * 0.8;
+
+    // EFEKT MOKREJ POWIERZCHNI (Specular Gloss)
+    vec3 viewDir = normalize(cameraPosition - FragPos);
+    vec3 reflectDir = reflect(-lightDir, norm);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 64.0); // Wąskie, ostre odbicie
+    vec3 wetSpecular = vec3(0.5) * spec * lightColor;
+
+    // Oświetlenie podstawowe + refleks wody
+    vec3 lighting = (ambient + diffuse) * baseColor + wetSpecular;
     
     // Wtapianie obiektów OBJ w kolor mgły
     vec3 finalColor = mix(skyColor, lighting, Visibility);
