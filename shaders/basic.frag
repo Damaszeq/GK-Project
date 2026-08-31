@@ -10,6 +10,8 @@ in vec4 FragPosLightSpace;
 uniform vec3 skyColor;
 uniform vec3 viewPos;
 uniform sampler2D shadowMap;
+uniform float isUnderwater;
+uniform float time;
 
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
 {
@@ -39,6 +41,13 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
     return shadow * 0.4;
 }
 
+// Proceduralna funkcja generująca caustyki na podstawie pozycji i czasu
+float getCaustics(vec3 pos) {
+    float c = sin(pos.x * 1.5 + time * 2.0) * cos(pos.z * 1.5 + time * 1.5);
+    c += sin(pos.x * 3.0 - time * 1.5) * sin(pos.z * 3.0 + time * 2.5);
+    return smoothstep(0.2, 0.8, c * 0.5 + 0.5);
+}
+
 void main()
 {
     vec3 baseColor = OurColor * 0.75;
@@ -60,6 +69,18 @@ void main()
     
     vec3 terrainColor = ambient + (1.0 - shadow) * diffuse + wetSpecular;
 
-    vec3 finalColor = mix(skyColor, terrainColor, Visibility);
+    // --- DODATEK: CAUSTYKI ---
+    // Im niżej (mniejsza współrzędna Y), tym wyraźniejsze caustyki pod wodą
+    float depthFactor = clamp(-FragPos.y * 0.2, 0.0, 1.0);
+    float caustics = getCaustics(FragPos) * isUnderwater * depthFactor * 0.4;
+    terrainColor += vec3(0.1, 0.3, 0.4) * caustics;
+    // ------------------------
+
+    // Podwodna mgła i gęstość
+    vec3 underwaterFogColor = vec3(0.02, 0.15, 0.25);
+    vec3 currentSkyColor = mix(skyColor, underwaterFogColor, isUnderwater);
+    float currentVisibility = mix(Visibility, pow(Visibility, 2.0), isUnderwater);
+
+    vec3 finalColor = mix(currentSkyColor, terrainColor, currentVisibility);
     FinalColor = vec4(finalColor, 1.0);
 }

@@ -12,6 +12,7 @@ from shader import Shader
 from framebuffer import Framebuffer
 from rain import Rain
 from model import Model
+from particles import BubbleSystem
 
 WINDOW_WIDTH = 1600
 WINDOW_HEIGHT = 900
@@ -39,14 +40,16 @@ def load_texture(path):
 def mouse_callback(window, xpos, ypos):
     camera.process_mouse(xpos, ypos)
 
-def render_scene(shader, terrain, sky_color):
+def render_scene(shader, terrain, sky_color, is_underwater, app_time):
     shader.use()
     shader.set_vec3("skyColor", glm.vec3(sky_color[0], sky_color[1], sky_color[2]))
+    shader.set_float("isUnderwater", is_underwater)
+    shader.set_float("time", app_time)
     model = glm.mat4(1.0)
     shader.set_mat4("model", model)
     terrain.draw()
 
-def render_models(model_shader, projection, view, camera, sky_color, light_color, light_direction, plane, models_to_draw):
+def render_models(model_shader, projection, view, camera, sky_color, light_color, light_direction, plane, models_to_draw, is_underwater, app_time):
     model_shader.use()
     model_shader.set_mat4("projection", projection)
     model_shader.set_mat4("view", view)
@@ -55,6 +58,8 @@ def render_models(model_shader, projection, view, camera, sky_color, light_color
     model_shader.set_vec3("skyColor", glm.vec3(sky_color[0], sky_color[1], sky_color[2]))
     model_shader.set_vec3("lightColor", light_color)
     model_shader.set_vec3("lightDirection", light_direction)
+    model_shader.set_float("isUnderwater", is_underwater)
+    model_shader.set_float("time", app_time)
     
     for obj, color, pos, scale in models_to_draw:
         mat = glm.translate(glm.mat4(1.0), pos)
@@ -160,6 +165,10 @@ def main():
     cloud_shader = Shader("shaders/cloud.vert", "shaders/cloud.frag")
     model_shader = Shader("shaders/model.vert", "shaders/model.frag")
     shadow_shader = Shader("shaders/shadow.vert", "shaders/shadow.frag")
+    particle_shader = Shader("shaders/particle.vert", "shaders/particle.frag")
+    
+    # SYSTEM BĄBELKÓW PODWODNYCH
+    bubbles = BubbleSystem(count=50)
     
     # SHADOW MAP FBO
     depthMapFBO = glGenFramebuffers(1)
@@ -256,7 +265,7 @@ def main():
     cloud_texture = load_texture("textures/clouds.jpg")
     
     light_direction = glm.normalize(glm.vec3(-0.2, -1.0, -0.1))
-    light_color = glm.vec3(0.6, 0.65, 0.7) # Chłodniejsze, szaro-niebieskie światło
+    light_color = glm.vec3(0.6, 0.65, 0.7)
 
     water_vertices = [
         -HALF_SIZE, 0.0, -HALF_SIZE,  0.0, 0.0, 0.0,
@@ -298,6 +307,12 @@ def main():
             glfw.set_window_should_close(window, True)
 
         camera.process_keyboard(window, delta_time)
+
+        # Flaga zanurzenia pod wodą (poziom wody to y = 0.0)
+        is_underwater = 1.0 if camera.position.y < 0.0 else 0.0
+
+        # Aktualizacja pozycji bąbelków
+        bubbles.update(delta_time, camera.position)
 
         # Macierz rzutowania światła (Shadow Pass Matrix)
         lightProjection = glm.ortho(-40.0, 40.0, -40.0, 40.0, 1.0, 75.0)
@@ -367,8 +382,8 @@ def main():
         shader.set_mat4("view", view_reflection)
         shader.set_vec3("viewPos", camera.position)
 
-        render_scene(shader, terrain, sky_color)
-        render_models(model_shader, projection, view_reflection, camera, sky_color, light_color, light_direction, reflection_plane, models_to_draw)
+        render_scene(shader, terrain, sky_color, is_underwater, app_time)
+        render_models(model_shader, projection, view_reflection, camera, sky_color, light_color, light_direction, reflection_plane, models_to_draw, is_underwater, app_time)
 
         # PASS 2: Załamanie (Refraction Pass)
         refraction_fbo.bind()
@@ -384,8 +399,8 @@ def main():
         shader.set_vec4("plane", refraction_plane)
         shader.set_vec3("viewPos", camera.position)
         
-        render_scene(shader, terrain, sky_color)
-        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, refraction_plane, models_to_draw)
+        render_scene(shader, terrain, sky_color, is_underwater, app_time)
+        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, refraction_plane, models_to_draw, is_underwater, app_time)
 
         # PASS 3: Renderowanie na EKRAN
         reflection_fbo.unbind(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -401,8 +416,8 @@ def main():
         shader.set_vec4("plane", screen_plane)
         shader.set_vec3("viewPos", camera.position)
 
-        render_scene(shader, terrain, sky_color)
-        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, screen_plane, models_to_draw)
+        render_scene(shader, terrain, sky_color, is_underwater, app_time)
+        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, screen_plane, models_to_draw, is_underwater, app_time)
 
         render_water(
             water_shader, water_mesh, projection, view_normal, camera,
@@ -411,6 +426,9 @@ def main():
         )
         
         render_rain(rain_shader, rain, projection, view_normal, app_time, screen_plane)
+        
+        # Rysowanie bąbelków widocznych tylko pod wodą
+        bubbles.draw(particle_shader, projection, view_normal, is_underwater)
 
         glfw.swap_buffers(window)
         glfw.poll_events()
