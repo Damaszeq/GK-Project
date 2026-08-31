@@ -14,7 +14,7 @@ uniform vec3 skyColor;
 void main()
 {
     // Ambient
-    float ambientStrength = 0.5;
+    float ambientStrength = 0.35;
     vec3 ambient = ambientStrength * lightColor;
 
     // Diffuse

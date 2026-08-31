@@ -13,7 +13,7 @@ uniform mat4 projection;
 uniform vec4 plane;
 
 // Zmniejszona gęstość mgły (wcześniej 0.025)
-uniform float density = 0.012;
+uniform float density = 0.010;
 uniform float gradient = 1.5;
 
 void main()
