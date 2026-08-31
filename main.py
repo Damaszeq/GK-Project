@@ -115,6 +115,7 @@ def render_clouds(cloud_shader, cloud_mesh, projection, view, app_time, sky_colo
     cloud_shader.use()
     cloud_shader.set_mat4("projection", projection)
     cloud_shader.set_mat4("view", view)
+    cloud_shader.set_vec4("plane", clip_plane)
     
     model = glm.translate(glm.mat4(1.0), glm.vec3(0.0, 25.0, 0.0))
     cloud_shader.set_mat4("model", model)
@@ -249,7 +250,7 @@ def main():
     ]
     water_mesh = Mesh(water_vertices)
 
-    CLOUD_SIZE = 1000.0
+    CLOUD_SIZE = 120.0
     cloud_vertices = [
         -CLOUD_SIZE, 0.0, -CLOUD_SIZE,  1.0, 1.0, 1.0,
         -CLOUD_SIZE, 0.0,  CLOUD_SIZE,  1.0, 1.0, 1.0,
@@ -267,7 +268,6 @@ def main():
     start_time = time.time()
     last_frame_time = start_time
 
-    # Szaro-niebieski odcień nieba i mgły pasujący do deszczowej sceny
     sky_color = (0.48, 0.52, 0.58, 1.0)
 
     while not glfw.window_should_close(window):
@@ -314,14 +314,16 @@ def main():
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         view_reflection = camera.get_reflection_view_matrix(water_height=0.0)
-        render_clouds(cloud_shader, cloud_mesh, projection, view_reflection, app_time, sky_color, cloud_texture, glm.vec4(0,1,0,0))
+        reflection_plane = glm.vec4(0.0, 1.0, 0.0, -0.05)
+
+        render_clouds(cloud_shader, cloud_mesh, projection, view_reflection, app_time, sky_color, cloud_texture, reflection_plane)
 
         shader.use()
-        shader.set_vec4("plane", glm.vec4(0.0, 1.0, 0.0, -0.05))
+        shader.set_vec4("plane", reflection_plane)
         shader.set_mat4("view", view_reflection)
 
         render_scene(shader, terrain, sky_color)
-        render_models(model_shader, projection, view_reflection, camera, sky_color, light_color, light_direction, glm.vec4(0.0, 1.0, 0.0, -0.05), models_to_draw)
+        render_models(model_shader, projection, view_reflection, camera, sky_color, light_color, light_direction, reflection_plane, models_to_draw)
 
         # PASS 2: Załamanie (Refraction Pass)
         refraction_fbo.bind()
@@ -331,11 +333,13 @@ def main():
 
         shader.use()
         view_normal = camera.get_view_matrix()
+        refraction_plane = glm.vec4(0.0, -1.0, 0.0, 0.05)
+
         shader.set_mat4("view", view_normal)
-        shader.set_vec4("plane", glm.vec4(0.0, -1.0, 0.0, 0.05))
+        shader.set_vec4("plane", refraction_plane)
         
         render_scene(shader, terrain, sky_color)
-        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, glm.vec4(0.0, -1.0, 0.0, 0.05), models_to_draw)
+        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, refraction_plane, models_to_draw)
 
         # PASS 3: Renderowanie na EKRAN
         reflection_fbo.unbind(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -343,14 +347,15 @@ def main():
         glClearColor(*sky_color)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        render_clouds(cloud_shader, cloud_mesh, projection, view_normal, app_time, sky_color, cloud_texture, glm.vec4(0,1,0,0))
+        screen_plane = glm.vec4(0.0, 0.0, 0.0, 0.0)
+        render_clouds(cloud_shader, cloud_mesh, projection, view_normal, app_time, sky_color, cloud_texture, screen_plane)
 
         shader.use()
         shader.set_mat4("view", view_normal)
-        shader.set_vec4("plane", glm.vec4(0.0, 0.0, 0.0, 0.0))
+        shader.set_vec4("plane", screen_plane)
         
         render_scene(shader, terrain, sky_color)
-        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, glm.vec4(0.0, 0.0, 0.0, 0.0), models_to_draw)
+        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, screen_plane, models_to_draw)
 
         render_water(
             water_shader, water_mesh, projection, view_normal, camera,
@@ -358,7 +363,7 @@ def main():
             app_time, ripple_fbo
         )
         
-        render_rain(rain_shader, rain, projection, view_normal, app_time, glm.vec4(0.0, 0.0, 0.0, 0.0))
+        render_rain(rain_shader, rain, projection, view_normal, app_time, screen_plane)
 
         glfw.swap_buffers(window)
         glfw.poll_events()
