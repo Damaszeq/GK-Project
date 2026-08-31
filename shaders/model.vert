@@ -8,11 +8,16 @@ layout (location = 3) in vec3 aColor;
 out vec3 Normal;
 out vec3 FragPos;
 out vec3 ObjectColor;
+out float Visibility;
 
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 uniform vec4 plane;
+
+// Zmniejszona gęstość mgły (wcześniej 0.025)
+uniform float density = 0.016;
+uniform float gradient = 1.5;
 
 void main()
 {
@@ -21,10 +26,15 @@ void main()
     // Klipowanie dla odbicia/załamania
     gl_ClipDistance[0] = dot(worldPosition, plane);
     
+    vec4 positionRelativeToCam = view * worldPosition;
+    gl_Position = projection * positionRelativeToCam;
+    
     FragPos = vec3(worldPosition);
     Normal = mat3(transpose(inverse(model))) * aNormal;
     ObjectColor = aColor;
-    
-    gl_Position = projection * view * worldPosition;
-}
 
+    // Obliczanie widoczności
+    float distance = length(positionRelativeToCam.xyz);
+    Visibility = exp(-pow((distance * density), gradient));
+    Visibility = clamp(Visibility, 0.0, 1.0);
+}

@@ -39,7 +39,9 @@ def load_texture(path):
 def mouse_callback(window, xpos, ypos):
     camera.process_mouse(xpos, ypos)
 
-def render_scene(shader, terrain):
+def render_scene(shader, terrain, sky_color):
+    shader.use()
+    shader.set_vec3("skyColor", glm.vec3(sky_color[0], sky_color[1], sky_color[2]))
     model = glm.mat4(1.0)
     shader.set_mat4("model", model)
     terrain.draw()
@@ -113,13 +115,10 @@ def render_clouds(cloud_shader, cloud_mesh, projection, view, app_time, sky_colo
     cloud_shader.use()
     cloud_shader.set_mat4("projection", projection)
     cloud_shader.set_mat4("view", view)
+    cloud_shader.set_vec4("plane", clip_plane)
     
-    # Przesuwamy chmury wysoko na niebo (Y = 25.0)
     model = glm.translate(glm.mat4(1.0), glm.vec3(0.0, 25.0, 0.0))
     cloud_shader.set_mat4("model", model)
-    
-    # Zabezpieczenie przed ucięciem
-    # Nie ustawiamy zmiennej "plane" w shaderze chmur, ale chmury są zawsze nad wodą (Y=25.0).
     
     cloud_shader.set_float("time", app_time)
     cloud_shader.set_vec3("skyColor", glm.vec3(sky_color[0], sky_color[1], sky_color[2]))
@@ -128,7 +127,6 @@ def render_clouds(cloud_shader, cloud_mesh, projection, view, app_time, sky_colo
     glBindTexture(GL_TEXTURE_2D, cloud_texture)
     cloud_shader.set_int("cloudTexture", 0)
     
-    # Disable depth writing so clouds act strictly as a sky background
     glDepthMask(GL_FALSE)
     cloud_mesh.draw()
     glDepthMask(GL_TRUE)
@@ -162,12 +160,10 @@ def main():
     cloud_shader = Shader("shaders/cloud.vert", "shaders/cloud.frag")
     model_shader = Shader("shaders/model.vert", "shaders/model.frag")
     
-    # Load Models (colors are handled automatically by MTL)
     rock_model = Model("models/Obj/stone_largeA.obj")
     plant_model = Model("models/Obj/plant_bush.obj")
     plant2_model = Model("models/Obj/plant_flatTall.obj")
     
-    # Shoreline nature assets
     tree_model1 = Model("models/Obj/tree_detailed.obj")
     tree_model2 = Model("models/Obj/tree_pineDefaultA.obj")
     mushroom_red = Model("models/Obj/mushroom_redGroup.obj")
@@ -175,7 +171,6 @@ def main():
     grass_model = Model("models/Obj/grass_large.obj")
     stone_small = Model("models/Obj/stone_smallA.obj")
     
-    # We will pass a dummy color vec3(1.0) because model shader ignores it
     dummy_color = glm.vec3(1.0)
     
     TERRAIN_SIZE = 60.0
@@ -185,7 +180,6 @@ def main():
     random.seed(123)
     models_to_draw = []
     
-    # We will generate 400 objects, mostly plants
     attempts = 0
     while len(models_to_draw) < 400 and attempts < 2000:
         attempts += 1
@@ -206,7 +200,6 @@ def main():
             else:
                 models_to_draw.append((plant2_model, dummy_color, glm.vec3(x, y, z), glm.vec3(scale)))
                 
-    # Shoreline nature
     attempts = 0
     nature_placed = 0
     while attempts < 3000 and nature_placed < 200:
@@ -215,24 +208,19 @@ def main():
         z = random.uniform(-25.0, 25.0)
         terrain_y = terrain.get_height(x, z)
         
-        # Place only on land
         if 0.2 < terrain_y < 4.5:
             rand_val = random.random()
             if rand_val < 0.3:
-                # 30% chance for trees
                 scale = random.uniform(1.2, 2.8)
                 t_model = tree_model1 if random.random() > 0.5 else tree_model2
                 models_to_draw.append((t_model, dummy_color, glm.vec3(x, terrain_y, z), glm.vec3(scale)))
             elif rand_val < 0.6:
-                # 30% chance for grass
                 scale = random.uniform(0.6, 1.2)
                 models_to_draw.append((grass_model, dummy_color, glm.vec3(x, terrain_y, z), glm.vec3(scale)))
             elif rand_val < 0.8:
-                # 20% chance for small stones
                 scale = random.uniform(0.4, 1.0)
                 models_to_draw.append((stone_small, dummy_color, glm.vec3(x, terrain_y, z), glm.vec3(scale)))
             else:
-                # 20% chance for mushrooms
                 scale = random.uniform(0.3, 0.7)
                 m_model = mushroom_red if random.random() > 0.5 else mushroom_tan
                 models_to_draw.append((m_model, dummy_color, glm.vec3(x, terrain_y, z), glm.vec3(scale)))
@@ -262,7 +250,7 @@ def main():
     ]
     water_mesh = Mesh(water_vertices)
 
-    CLOUD_SIZE = 1000.0
+    CLOUD_SIZE = 120.0
     cloud_vertices = [
         -CLOUD_SIZE, 0.0, -CLOUD_SIZE,  1.0, 1.0, 1.0,
         -CLOUD_SIZE, 0.0,  CLOUD_SIZE,  1.0, 1.0, 1.0,
@@ -280,7 +268,7 @@ def main():
     start_time = time.time()
     last_frame_time = start_time
 
-    sky_color = (0.45, 0.68, 0.9, 1.0)
+    sky_color = (0.48, 0.52, 0.58, 1.0)
 
     while not glfw.window_should_close(window):
         current_time = time.time()
@@ -319,23 +307,23 @@ def main():
         glDepthMask(GL_TRUE)
         glEnable(GL_DEPTH_TEST)
 
-# PASS 1: Odbicie (Reflection Pass)
+        # PASS 1: Odbicie (Reflection Pass)
         reflection_fbo.bind()
         glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
         glClearColor(*sky_color)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         view_reflection = camera.get_reflection_view_matrix(water_height=0.0)
-        render_clouds(cloud_shader, cloud_mesh, projection, view_reflection, app_time, sky_color, cloud_texture, glm.vec4(0,1,0,0))
+        reflection_plane = glm.vec4(0.0, 1.0, 0.0, -0.05)
+
+        render_clouds(cloud_shader, cloud_mesh, projection, view_reflection, app_time, sky_color, cloud_texture, reflection_plane)
 
         shader.use()
-        # ZACHOWUJEMY GEOMETRIĘ NAD WODĄ (Y >= 0.0)
-        shader.set_vec4("plane", glm.vec4(0.0, 1.0, 0.0, -0.05))
+        shader.set_vec4("plane", reflection_plane)
         shader.set_mat4("view", view_reflection)
 
-        render_scene(shader, terrain)
-        render_models(model_shader, projection, view_reflection, camera, sky_color, light_color, light_direction, glm.vec4(0.0, 1.0, 0.0, -0.05), models_to_draw)
-        render_rain(rain_shader, rain, projection, view_reflection, app_time, glm.vec4(0.0, 1.0, 0.0, -0.05))
+        render_scene(shader, terrain, sky_color)
+        render_models(model_shader, projection, view_reflection, camera, sky_color, light_color, light_direction, reflection_plane, models_to_draw)
 
         # PASS 2: Załamanie (Refraction Pass)
         refraction_fbo.bind()
@@ -345,11 +333,13 @@ def main():
 
         shader.use()
         view_normal = camera.get_view_matrix()
+        refraction_plane = glm.vec4(0.0, -1.0, 0.0, 0.05)
+
         shader.set_mat4("view", view_normal)
-        # ZACHOWUJEMY GEOMETRIĘ POD WODĄ (Y <= 0.0)
-        shader.set_vec4("plane", glm.vec4(0.0, -1.0, 0.0, 0.05))
-        render_scene(shader, terrain)
-        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, glm.vec4(0.0, -1.0, 0.0, 0.05), models_to_draw)
+        shader.set_vec4("plane", refraction_plane)
+        
+        render_scene(shader, terrain, sky_color)
+        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, refraction_plane, models_to_draw)
 
         # PASS 3: Renderowanie na EKRAN
         reflection_fbo.unbind(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -357,13 +347,15 @@ def main():
         glClearColor(*sky_color)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        render_clouds(cloud_shader, cloud_mesh, projection, view_normal, app_time, sky_color, cloud_texture, glm.vec4(0,1,0,0))
+        screen_plane = glm.vec4(0.0, 0.0, 0.0, 0.0)
+        render_clouds(cloud_shader, cloud_mesh, projection, view_normal, app_time, sky_color, cloud_texture, screen_plane)
 
         shader.use()
         shader.set_mat4("view", view_normal)
-        shader.set_vec4("plane", glm.vec4(0.0, 0.0, 0.0, 0.0))
-        render_scene(shader, terrain)
-        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, glm.vec4(0.0, 0.0, 0.0, 0.0), models_to_draw)
+        shader.set_vec4("plane", screen_plane)
+        
+        render_scene(shader, terrain, sky_color)
+        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, screen_plane, models_to_draw)
 
         render_water(
             water_shader, water_mesh, projection, view_normal, camera,
@@ -371,7 +363,7 @@ def main():
             app_time, ripple_fbo
         )
         
-        render_rain(rain_shader, rain, projection, view_normal, app_time, glm.vec4(0.0, 0.0, 0.0, 0.0))
+        render_rain(rain_shader, rain, projection, view_normal, app_time, screen_plane)
 
         glfw.swap_buffers(window)
         glfw.poll_events()
