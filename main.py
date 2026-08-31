@@ -10,6 +10,7 @@ from mesh import Mesh
 from shader import Shader
 from framebuffer import Framebuffer
 from rain import Rain
+from model import Model
 
 WINDOW_WIDTH = 1600
 WINDOW_HEIGHT = 900
@@ -42,9 +43,21 @@ def render_scene(shader, terrain, cube_mesh):
     shader.set_mat4("model", model)
     terrain.draw()
 
-    model = glm.translate(glm.mat4(1.0), glm.vec3(0.0, 1.0, 0.0))
-    shader.set_mat4("model", model)
-    cube_mesh.draw()
+def render_models(model_shader, projection, view, camera, sky_color, light_color, light_direction, plane, models_to_draw):
+    model_shader.use()
+    model_shader.set_mat4("projection", projection)
+    model_shader.set_mat4("view", view)
+    model_shader.set_vec4("plane", plane)
+    model_shader.set_vec3("cameraPosition", camera.position)
+    model_shader.set_vec3("skyColor", glm.vec3(sky_color[0], sky_color[1], sky_color[2]))
+    model_shader.set_vec3("lightColor", light_color)
+    model_shader.set_vec3("lightDirection", light_direction)
+    
+    for obj, color, pos, scale in models_to_draw:
+        mat = glm.translate(glm.mat4(1.0), pos)
+        mat = glm.scale(mat, scale)
+        model_shader.set_mat4("model", mat)
+        obj.draw()
 
 def render_water(water_shader, water_mesh, projection, view, camera, move_factor, light_color, light_direction, reflection_fbo, refraction_fbo, dudv_texture, normal_texture, app_time, ripple_fbo):
     water_shader.use()
@@ -156,11 +169,75 @@ def main():
     rain_shader = Shader("shaders/rain.vert", "shaders/rain.frag")
     ripple_shader = Shader("shaders/ripple.vert", "shaders/ripple.frag")
     cloud_shader = Shader("shaders/cloud.vert", "shaders/cloud.frag")
+    model_shader = Shader("shaders/model.vert", "shaders/model.frag")
+    
+    # Load Models and assign solid colors
+    rock_model = Model("models/Obj/stone_largeA.obj")
+    rock_color = glm.vec3(0.35, 0.35, 0.35)
+    
+    plant_model = Model("models/Obj/plant_bush.obj")
+    plant_color = glm.vec3(0.18, 0.38, 0.18)
+    
+    plant2_model = Model("models/Obj/plant_flatTall.obj")
+    plant2_color = glm.vec3(0.2, 0.45, 0.2)
+    
+    lantern_model = Model("models/Obj/statue_obelisk.obj")
+    lantern_color = glm.vec3(0.6, 0.6, 0.55)
+    
+    tree_model = Model("models/Obj/tree_detailed.obj")
+    tree_color = glm.vec3(0.15, 0.28, 0.15)
     
     TERRAIN_SIZE = 60.0
     HALF_SIZE = TERRAIN_SIZE / 2.0
+    terrain = Terrain("textures/heightmap.png", size=TERRAIN_SIZE, max_height=8.0, min_height=-0.8)
+    
+    import random
+    random.seed(123)
+    models_to_draw = []
+    
+    # We will generate 400 objects, mostly plants
+    attempts = 0
+    while len(models_to_draw) < 400 and attempts < 2000:
+        attempts += 1
+        x = random.uniform(-25.0, 25.0)
+        z = random.uniform(-25.0, 25.0)
+        
+        terrain_y = terrain.get_height(x, z)
+        scale = random.uniform(0.4, 0.75)
+        
+        if terrain_y + scale < -0.1:
+            y = terrain_y
+            
+            rand_val = random.random()
+            if rand_val < 0.20:
+                models_to_draw.append((rock_model, rock_color, glm.vec3(x, y, z), glm.vec3(scale)))
+            elif rand_val < 0.60:
+                models_to_draw.append((plant_model, plant_color, glm.vec3(x, y, z), glm.vec3(scale)))
+            else:
+                models_to_draw.append((plant2_model, plant2_color, glm.vec3(x, y, z), glm.vec3(scale)))
+                
+    # Shoreline trees and lanterns
+    attempts = 0
+    trees_placed = 0
+    lanterns_placed = 0
+    while attempts < 1000 and (trees_placed < 40 or lanterns_placed < 10):
+        attempts += 1
+        x = random.uniform(-25.0, 25.0)
+        z = random.uniform(-25.0, 25.0)
+        terrain_y = terrain.get_height(x, z)
+        
+        # Place only on land (above water 0.0) but not too high on mountains
+        if 0.2 < terrain_y < 2.5:
+            if random.random() > 0.2 and trees_placed < 40:
+                scale = random.uniform(1.5, 3.0)
+                models_to_draw.append((tree_model, tree_color, glm.vec3(x, terrain_y, z), glm.vec3(scale)))
+                trees_placed += 1
+            elif lanterns_placed < 10:
+                scale = random.uniform(0.6, 1.0)
+                models_to_draw.append((lantern_model, lantern_color, glm.vec3(x, terrain_y, z), glm.vec3(scale)))
+                lanterns_placed += 1
 
-    rain = Rain(num_drops=5000, bounds=(-HALF_SIZE, HALF_SIZE, 0, 40, -HALF_SIZE, HALF_SIZE))
+    rain = Rain(num_drops=1500, bounds=(-HALF_SIZE, HALF_SIZE, 0, 40, -HALF_SIZE, HALF_SIZE))
     
     water_shader.use()
     water_shader.set_int("reflectionTexture", 0)
@@ -176,8 +253,6 @@ def main():
     
     light_color = glm.vec3(1.0, 0.98, 0.9)
     light_direction = glm.normalize(glm.vec3(0.0, -1.0, 0.5))
-
-    terrain = Terrain("textures/heightmap.png", size=TERRAIN_SIZE, max_height=8.0, min_height=-0.8)
 
     water_vertices = [
         -HALF_SIZE, 0.0, -HALF_SIZE,  0.0, 0.0, 0.0,
@@ -283,6 +358,7 @@ def main():
         shader.set_mat4("view", view_reflection)
 
         render_scene(shader, terrain, cube_mesh)
+        render_models(model_shader, projection, view_reflection, camera, sky_color, light_color, light_direction, glm.vec4(0.0, 1.0, 0.0, -0.05), models_to_draw)
         render_rain(rain_shader, rain, projection, view_reflection, app_time, glm.vec4(0.0, 1.0, 0.0, -0.05))
 
         # PASS 2: Załamanie (Refraction Pass)
@@ -297,6 +373,7 @@ def main():
         # ZACHOWUJEMY GEOMETRIĘ POD WODĄ (Y <= 0.0)
         shader.set_vec4("plane", glm.vec4(0.0, -1.0, 0.0, 0.05))
         render_scene(shader, terrain, cube_mesh)
+        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, glm.vec4(0.0, -1.0, 0.0, 0.05), models_to_draw)
 
         # PASS 3: Renderowanie na EKRAN
         reflection_fbo.unbind(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -310,6 +387,7 @@ def main():
         shader.set_mat4("view", view_normal)
         shader.set_vec4("plane", glm.vec4(0.0, 0.0, 0.0, 0.0))
         render_scene(shader, terrain, cube_mesh)
+        render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, glm.vec4(0.0, 0.0, 0.0, 0.0), models_to_draw)
 
         render_water(
             water_shader, water_mesh, projection, view_normal, camera,

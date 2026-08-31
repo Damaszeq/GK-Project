@@ -37,6 +37,10 @@ class Terrain:
                     
                 row.append(y)
             heights.append(row)
+            
+        self.heights = heights
+        self.width = width
+        self.height = height
 
         # 3. Wyliczanie wygładzonych normalnych dla siatki
         normals = [[(0.0, 1.0, 0.0) for _ in range(width)] for _ in range(height)]
@@ -116,6 +120,37 @@ class Terrain:
                 vertices.extend([x1, y11, z1, c11[0], c11[1], c11[2]])
 
         return Mesh(vertices)
+
+    def get_height(self, x, z):
+        # Convert world coordinates (x, z) to grid indices
+        half_size = self.size / 2.0
+        
+        # Normalize to 0..1
+        nx = (x + half_size) / self.size
+        nz = (z + half_size) / self.size
+        
+        # Grid coords
+        gx = nx * (self.width - 1)
+        gz = nz * (self.height - 1)
+        
+        # Check bounds
+        if gx < 0 or gx >= self.width - 1 or gz < 0 or gz >= self.height - 1:
+            return 0.0
+            
+        # Bilinear interpolation
+        ix = int(gx)
+        iz = int(gz)
+        fx = gx - ix
+        fz = gz - iz
+        
+        h00 = self.heights[iz][ix]
+        h10 = self.heights[iz][ix + 1]
+        h01 = self.heights[iz + 1][ix]
+        h11 = self.heights[iz + 1][ix + 1]
+        
+        h0 = h00 * (1 - fx) + h10 * fx
+        h1 = h01 * (1 - fx) + h11 * fx
+        return h0 * (1 - fz) + h1 * fz
 
     def draw(self):
         self.mesh.draw()
