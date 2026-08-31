@@ -3,6 +3,7 @@ from OpenGL.GL import *
 import time
 import glm
 from PIL import Image
+import random
 
 from terrain import Terrain
 from camera import Camera
@@ -38,7 +39,7 @@ def load_texture(path):
 def mouse_callback(window, xpos, ypos):
     camera.process_mouse(xpos, ypos)
 
-def render_scene(shader, terrain, cube_mesh):
+def render_scene(shader, terrain):
     model = glm.mat4(1.0)
     shader.set_mat4("model", model)
     terrain.draw()
@@ -59,15 +60,11 @@ def render_models(model_shader, projection, view, camera, sky_color, light_color
         model_shader.set_mat4("model", mat)
         obj.draw()
 
-def render_water(water_shader, water_mesh, projection, view, camera, move_factor, light_color, light_direction, reflection_fbo, refraction_fbo, dudv_texture, normal_texture, app_time, ripple_fbo):
+def render_water(water_shader, water_mesh, projection, view, camera, reflection_fbo, refraction_fbo, app_time, ripple_fbo):
     water_shader.use()
     water_shader.set_mat4("projection", projection)
     water_shader.set_mat4("view", view)
-    water_shader.set_float("moveFactor", move_factor)
     water_shader.set_vec3("cameraPosition", camera.position)
-    water_shader.set_vec3("lightColor", light_color)
-    water_shader.set_vec3("lightDirection", light_direction)
-    water_shader.set_float("appTime", app_time)
     
     model = glm.mat4(1.0)
     water_shader.set_mat4("model", model)
@@ -77,12 +74,6 @@ def render_water(water_shader, water_mesh, projection, view, camera, move_factor
     
     glActiveTexture(GL_TEXTURE1)
     glBindTexture(GL_TEXTURE_2D, refraction_fbo.color_texture)
-    
-    glActiveTexture(GL_TEXTURE2)
-    glBindTexture(GL_TEXTURE_2D, dudv_texture)
-    
-    glActiveTexture(GL_TEXTURE3)
-    glBindTexture(GL_TEXTURE_2D, normal_texture)
     
     glActiveTexture(GL_TEXTURE4)
     glBindTexture(GL_TEXTURE_2D, refraction_fbo.depth_texture)
@@ -191,7 +182,6 @@ def main():
     HALF_SIZE = TERRAIN_SIZE / 2.0
     terrain = Terrain("textures/heightmap.png", size=TERRAIN_SIZE, max_height=8.0, min_height=-0.8)
     
-    import random
     random.seed(123)
     models_to_draw = []
     
@@ -254,13 +244,9 @@ def main():
     water_shader.use()
     water_shader.set_int("reflectionTexture", 0)
     water_shader.set_int("refractionTexture", 1)
-    water_shader.set_int("dudvMap", 2)
-    water_shader.set_int("normalMap", 3)
     water_shader.set_int("depthMap", 4)
     water_shader.set_int("rippleMap", 5)
     
-    dudv_texture = load_texture("textures/waterDUDV.png")
-    normal_texture = load_texture("textures/matchingNormalMap.png")
     cloud_texture = load_texture("textures/clouds.jpg")
     
     light_color = glm.vec3(1.0, 0.98, 0.9)
@@ -276,23 +262,6 @@ def main():
     ]
     water_mesh = Mesh(water_vertices)
 
-    cube_vertices = [
-        -0.5, -1.0,  0.5,  0.8, 0.1, 0.1,
-         0.5, -1.0,  0.5,  0.8, 0.1, 0.1,
-         0.5,  1.0,  0.5,  0.8, 0.1, 0.1,
-        -0.5, -1.0,  0.5,  0.8, 0.1, 0.1,
-         0.5,  1.0,  0.5,  0.8, 0.1, 0.1,
-        -0.5,  1.0,  0.5,  0.8, 0.1, 0.1,
-        
-        -0.5, -1.0, -0.5,  0.8, 0.1, 0.1,
-         0.5,  1.0, -0.5,  0.8, 0.1, 0.1,
-         0.5, -1.0, -0.5,  0.8, 0.1, 0.1,
-        -0.5, -1.0, -0.5,  0.8, 0.1, 0.1,
-        -0.5,  1.0, -0.5,  0.8, 0.1, 0.1,
-         0.5,  1.0, -0.5,  0.8, 0.1, 0.1,
-    ]
-    cube_mesh = Mesh(cube_vertices)
-    
     CLOUD_SIZE = 1000.0
     cloud_vertices = [
         -CLOUD_SIZE, 0.0, -CLOUD_SIZE,  1.0, 1.0, 1.0,
@@ -310,8 +279,6 @@ def main():
 
     start_time = time.time()
     last_frame_time = start_time
-    move_factor = 0.0
-    WAVE_SPEED = 0.08
 
     sky_color = (0.45, 0.68, 0.9, 1.0)
 
@@ -320,9 +287,6 @@ def main():
         delta_time = current_time - last_frame_time
         last_frame_time = current_time
         app_time = current_time - start_time
-        
-        move_factor += WAVE_SPEED * delta_time
-        move_factor %= 1.0
 
         if glfw.get_key(window, glfw.KEY_ESCAPE) == glfw.PRESS:
             glfw.set_window_should_close(window, True)
@@ -369,7 +333,7 @@ def main():
         shader.set_vec4("plane", glm.vec4(0.0, 1.0, 0.0, -0.05))
         shader.set_mat4("view", view_reflection)
 
-        render_scene(shader, terrain, cube_mesh)
+        render_scene(shader, terrain)
         render_models(model_shader, projection, view_reflection, camera, sky_color, light_color, light_direction, glm.vec4(0.0, 1.0, 0.0, -0.05), models_to_draw)
         render_rain(rain_shader, rain, projection, view_reflection, app_time, glm.vec4(0.0, 1.0, 0.0, -0.05))
 
@@ -384,7 +348,7 @@ def main():
         shader.set_mat4("view", view_normal)
         # ZACHOWUJEMY GEOMETRIĘ POD WODĄ (Y <= 0.0)
         shader.set_vec4("plane", glm.vec4(0.0, -1.0, 0.0, 0.05))
-        render_scene(shader, terrain, cube_mesh)
+        render_scene(shader, terrain)
         render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, glm.vec4(0.0, -1.0, 0.0, 0.05), models_to_draw)
 
         # PASS 3: Renderowanie na EKRAN
@@ -398,13 +362,12 @@ def main():
         shader.use()
         shader.set_mat4("view", view_normal)
         shader.set_vec4("plane", glm.vec4(0.0, 0.0, 0.0, 0.0))
-        render_scene(shader, terrain, cube_mesh)
+        render_scene(shader, terrain)
         render_models(model_shader, projection, view_normal, camera, sky_color, light_color, light_direction, glm.vec4(0.0, 0.0, 0.0, 0.0), models_to_draw)
 
         render_water(
             water_shader, water_mesh, projection, view_normal, camera,
-            move_factor, light_color, light_direction,
-            reflection_fbo, refraction_fbo, dudv_texture, normal_texture,
+            reflection_fbo, refraction_fbo,
             app_time, ripple_fbo
         )
         

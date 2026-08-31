@@ -9,17 +9,9 @@ out vec4 FinalColor;
 
 uniform sampler2D reflectionTexture;
 uniform sampler2D refractionTexture;
-uniform sampler2D dudvMap;
-uniform sampler2D normalMap;
 uniform sampler2D depthMap;
 uniform sampler2D rippleMap;
 
-uniform float moveFactor;
-uniform vec3 lightColor;
-uniform vec3 lightDirection;
-uniform float appTime;
-
-const float waveStrength = 0.0; // Płaska woda (lustro)
 const float near = 0.1;
 const float far = 100.0;
 
@@ -41,13 +33,7 @@ void main() {
     float floorDistance = getLinearDepth(texCoords);
     float waterDepth = floorDistance - waterDistance;
 
-    // 3. Obliczenie zniekształceń DuDv & Ripples
-    vec2 distCoord1 = textureCoords * 4.5 + vec2(moveFactor * 2.0, moveFactor * 1.5);
-    vec2 distCoord2 = textureCoords * 4.5 + vec2(-moveFactor * 1.8, moveFactor * 2.2);
-
-    vec2 distortion1 = (texture(dudvMap, distCoord1).rg * 2.0 - 1.0) * waveStrength;
-    vec2 distortion2 = (texture(dudvMap, distCoord2).rg * 2.0 - 1.0) * waveStrength;
-
+    // 3. Obliczenie zniekształceń Ripples
     vec2 ripTex = vec2(worldPosFrag.x / 40.0 + 0.5, worldPosFrag.z / 40.0 + 0.5);
     float texel = 1.0 / 512.0;
     float rL = texture(rippleMap, ripTex - vec2(texel, 0.0)).r;
@@ -61,7 +47,7 @@ void main() {
     vec3 rippleNormal = vec3(ripX, 0.0, ripZ);
     vec2 rippleDistortion = vec2(ripX, ripZ) * 0.02;
 
-    vec2 totalDistortion = (distortion1 + distortion2 + rippleDistortion) * clamp(waterDepth / 1.5, 0.0, 1.0);
+    vec2 totalDistortion = rippleDistortion * clamp(waterDepth / 1.5, 0.0, 1.0);
 
     // 4. DEPTH SAFETY CHECK (dla Refrakcji)
     vec2 testRefractCoords = clamp(texCoords + totalDistortion, 0.001, 0.999);
