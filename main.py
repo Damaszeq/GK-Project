@@ -181,9 +181,6 @@ def main():
     plant2_model = Model("models/Obj/plant_flatTall.obj")
     plant2_color = glm.vec3(0.2, 0.45, 0.2)
     
-    lantern_model = Model("models/Obj/statue_obelisk.obj")
-    lantern_color = glm.vec3(0.6, 0.6, 0.55)
-    
     tree_model = Model("models/Obj/tree_detailed.obj")
     tree_color = glm.vec3(0.15, 0.28, 0.15)
     
@@ -216,11 +213,10 @@ def main():
             else:
                 models_to_draw.append((plant2_model, plant2_color, glm.vec3(x, y, z), glm.vec3(scale)))
                 
-    # Shoreline trees and lanterns
+    # Shoreline trees
     attempts = 0
     trees_placed = 0
-    lanterns_placed = 0
-    while attempts < 1000 and (trees_placed < 40 or lanterns_placed < 10):
+    while attempts < 1000 and trees_placed < 40:
         attempts += 1
         x = random.uniform(-25.0, 25.0)
         z = random.uniform(-25.0, 25.0)
@@ -228,14 +224,10 @@ def main():
         
         # Place only on land (above water 0.0) but not too high on mountains
         if 0.2 < terrain_y < 2.5:
-            if random.random() > 0.2 and trees_placed < 40:
+            if random.random() > 0.2:
                 scale = random.uniform(1.5, 3.0)
                 models_to_draw.append((tree_model, tree_color, glm.vec3(x, terrain_y, z), glm.vec3(scale)))
                 trees_placed += 1
-            elif lanterns_placed < 10:
-                scale = random.uniform(0.6, 1.0)
-                models_to_draw.append((lantern_model, lantern_color, glm.vec3(x, terrain_y, z), glm.vec3(scale)))
-                lanterns_placed += 1
 
     rain = Rain(num_drops=1500, bounds=(-HALF_SIZE, HALF_SIZE, 0, 40, -HALF_SIZE, HALF_SIZE))
     
