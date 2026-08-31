@@ -171,18 +171,21 @@ def main():
     cloud_shader = Shader("shaders/cloud.vert", "shaders/cloud.frag")
     model_shader = Shader("shaders/model.vert", "shaders/model.frag")
     
-    # Load Models and assign solid colors
+    # Load Models (colors are handled automatically by MTL)
     rock_model = Model("models/Obj/stone_largeA.obj")
-    rock_color = glm.vec3(0.35, 0.35, 0.35)
-    
     plant_model = Model("models/Obj/plant_bush.obj")
-    plant_color = glm.vec3(0.18, 0.38, 0.18)
-    
     plant2_model = Model("models/Obj/plant_flatTall.obj")
-    plant2_color = glm.vec3(0.2, 0.45, 0.2)
     
-    tree_model = Model("models/Obj/tree_detailed.obj")
-    tree_color = glm.vec3(0.15, 0.28, 0.15)
+    # Shoreline nature assets
+    tree_model1 = Model("models/Obj/tree_detailed.obj")
+    tree_model2 = Model("models/Obj/tree_pineDefaultA.obj")
+    mushroom_red = Model("models/Obj/mushroom_redGroup.obj")
+    mushroom_tan = Model("models/Obj/mushroom_tanGroup.obj")
+    grass_model = Model("models/Obj/grass_large.obj")
+    stone_small = Model("models/Obj/stone_smallA.obj")
+    
+    # We will pass a dummy color vec3(1.0) because model shader ignores it
+    dummy_color = glm.vec3(1.0)
     
     TERRAIN_SIZE = 60.0
     HALF_SIZE = TERRAIN_SIZE / 2.0
@@ -207,27 +210,44 @@ def main():
             
             rand_val = random.random()
             if rand_val < 0.20:
-                models_to_draw.append((rock_model, rock_color, glm.vec3(x, y, z), glm.vec3(scale)))
+                models_to_draw.append((rock_model, dummy_color, glm.vec3(x, y, z), glm.vec3(scale)))
             elif rand_val < 0.60:
-                models_to_draw.append((plant_model, plant_color, glm.vec3(x, y, z), glm.vec3(scale)))
+                models_to_draw.append((plant_model, dummy_color, glm.vec3(x, y, z), glm.vec3(scale)))
             else:
-                models_to_draw.append((plant2_model, plant2_color, glm.vec3(x, y, z), glm.vec3(scale)))
+                models_to_draw.append((plant2_model, dummy_color, glm.vec3(x, y, z), glm.vec3(scale)))
                 
-    # Shoreline trees
+    # Shoreline nature
     attempts = 0
-    trees_placed = 0
-    while attempts < 1000 and trees_placed < 40:
+    nature_placed = 0
+    while attempts < 3000 and nature_placed < 200:
         attempts += 1
         x = random.uniform(-25.0, 25.0)
         z = random.uniform(-25.0, 25.0)
         terrain_y = terrain.get_height(x, z)
         
-        # Place only on land (above water 0.0) but not too high on mountains
-        if 0.2 < terrain_y < 2.5:
-            if random.random() > 0.2:
-                scale = random.uniform(1.5, 3.0)
-                models_to_draw.append((tree_model, tree_color, glm.vec3(x, terrain_y, z), glm.vec3(scale)))
-                trees_placed += 1
+        # Place only on land
+        if 0.2 < terrain_y < 4.5:
+            rand_val = random.random()
+            if rand_val < 0.3:
+                # 30% chance for trees
+                scale = random.uniform(1.2, 2.8)
+                t_model = tree_model1 if random.random() > 0.5 else tree_model2
+                models_to_draw.append((t_model, dummy_color, glm.vec3(x, terrain_y, z), glm.vec3(scale)))
+            elif rand_val < 0.6:
+                # 30% chance for grass
+                scale = random.uniform(0.6, 1.2)
+                models_to_draw.append((grass_model, dummy_color, glm.vec3(x, terrain_y, z), glm.vec3(scale)))
+            elif rand_val < 0.8:
+                # 20% chance for small stones
+                scale = random.uniform(0.4, 1.0)
+                models_to_draw.append((stone_small, dummy_color, glm.vec3(x, terrain_y, z), glm.vec3(scale)))
+            else:
+                # 20% chance for mushrooms
+                scale = random.uniform(0.3, 0.7)
+                m_model = mushroom_red if random.random() > 0.5 else mushroom_tan
+                models_to_draw.append((m_model, dummy_color, glm.vec3(x, terrain_y, z), glm.vec3(scale)))
+                
+            nature_placed += 1
 
     rain = Rain(num_drops=1500, bounds=(-HALF_SIZE, HALF_SIZE, 0, 40, -HALF_SIZE, HALF_SIZE))
     
