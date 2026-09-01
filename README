@@ -1,0 +1,21 @@
+Projekt zakłada: render tafli wody z elementem deszczu (odbicie, refrakcja i efekt Fresnela)
+
+Projekt napisany został w języku Python
+
+Do projektu dołączony jest plik `requirements.txt`, który zawiera wszystkie wymagane biblioteki. Można je zainstalować za pomocą przygotowanego skryptu:
+python setup.py
+
+Po pobraniu bibliotek, projekt można uruchomić za pomocą polecenia:
+python main.py
+
+STEROWANIE KAMERĄ:
+- Wciśnięcie klawisza `W` powoduje przesunięcie kamery do przodu
+- Wciśnięcie klawisza `S` powoduje przesunięcie kamery do tyłu
+- Wciśnięcie klawisza `A` powoduje przesunięcie kamery w lewo
+- Wciśnięcie klawisza `D` powoduje przesunięcie kamery w prawo
+- Wciśnięcie klawisza `Q` powoduje przesunięcie kamery w dół
+- Wciśnięcie klawisza `E` powoduje przesunięcie kamery do góry
+- Przytrzymanie klawisza `LSHIFT` powoduje zwiększenie prędkości poruszania się kamery
+- Wciśnięcie klawisza `ESC` powoduje wyjście z programu
+
+Projekt stworzony przez Tomasz Wejner i Mikołaj Neldner
