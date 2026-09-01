@@ -17,7 +17,7 @@ void main()
     vec4 worldPosition = model * vec4(aPos, 1.0);
     WorldPos = worldPosition.xyz;
     
-    // Płaszczyzna obcinania (dla poprawnego odbicia w wodzie)
+    // Płaszczyzna obcinania
     gl_ClipDistance[0] = dot(worldPosition, plane);
 
     gl_Position = projection * view * worldPosition;

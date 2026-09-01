@@ -69,12 +69,11 @@ void main()
     
     vec3 terrainColor = ambient + (1.0 - shadow) * diffuse + wetSpecular;
 
-    // --- DODATEK: CAUSTYKI ---
+    // CAUSTYKI
     // Im niżej (mniejsza współrzędna Y), tym wyraźniejsze caustyki pod wodą
     float depthFactor = clamp(-FragPos.y * 0.2, 0.0, 1.0);
     float caustics = getCaustics(FragPos) * isUnderwater * depthFactor * 0.4;
     terrainColor += vec3(0.1, 0.3, 0.4) * caustics;
-    // ------------------------
 
     // Podwodna mgła i gęstość
     vec3 underwaterFogColor = vec3(0.02, 0.15, 0.25);

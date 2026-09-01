@@ -44,11 +44,10 @@ void main()
     // Oświetlenie podstawowe + refleks wody
     vec3 lighting = (ambient + diffuse) * baseColor + wetSpecular;
     
-    // --- DODATEK: CAUSTYKI NA MODELACH ---
+    // CAUSTYKI NA MODELACH
     float depthFactor = clamp(-FragPos.y * 0.2, 0.0, 1.0);
     float caustics = getCaustics(FragPos) * isUnderwater * depthFactor * 0.4;
     lighting += vec3(0.1, 0.3, 0.4) * caustics;
-    // ------------------------------------
 
     // Podwodna mgła i gęstość
     vec3 underwaterFogColor = vec3(0.02, 0.15, 0.25);

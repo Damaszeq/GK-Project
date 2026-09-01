@@ -67,7 +67,7 @@ void main() {
                              smoothstep(vec2(1.0), vec2(0.88), texCoords);
     float edgeWeight = screenEdgeFactor.x * screenEdgeFactor.y;
 
-    // Używamy texCoords z odwróconą osią Y, ponieważ kamera odbicia renderuje obraz odwrócony przestrzennie.
+    // texCoords z odwróconą osią Y -> kamera odbicia renderuje obraz odwrócony przestrzennie.
     vec2 reflectTexCoords = clamp(vec2(texCoords.x, 1.0 - texCoords.y) + (totalDistortion * edgeWeight), 0.005, 0.995);
 
     // 6. Próbkowanie buforów

@@ -11,12 +11,12 @@ class Terrain:
         self.mesh = self._generate_terrain(heightmap_path)
 
     def _generate_terrain(self, path):
-        # 1. Wczytanie obrazu
+        # Wczytanie obrazu
         img = Image.open(path).convert('L')
         width, height = img.size
         pixels = img.load()
 
-        # 2. Generowanie siatki wysokości z organicznym szumem
+        # Generowanie siatki wysokości z organicznym szumem
         heights = []
         for z in range(height):
             row = []
@@ -41,7 +41,7 @@ class Terrain:
         self.width = width
         self.height = height
 
-        # 3. Wyliczanie wygładzonych normalnych
+        # Wyliczanie wygładzonych normalnych
         normals = [[(0.0, 1.0, 0.0) for _ in range(width)] for _ in range(height)]
         dx = self.size / (width - 1)
         dz = self.size / (height - 1)
@@ -61,7 +61,7 @@ class Terrain:
                 if length > 0:
                     normals[z][x] = (nx / length, ny / length, nz / length)
 
-        # 4. Generowanie wierzchołków
+        # Generowanie wierzchołków
         vertices = []
         half_size = self.size / 2.0
 
@@ -113,12 +113,11 @@ class Terrain:
                 vertices.extend([x0, y01, z1, c01[0], c01[1], c01[2]])
                 vertices.extend([x1, y11, z1, c11[0], c11[1], c11[2]])
 
-        # --- Dodawanie pionowych ścian na krawędziach (Skirt) ---
+        # --- Dodawanie pionowych ścian na krawędziach ---
         skirt_bottom = -5.0
         skirt_color = (0.15, 0.15, 0.14)
 
         def add_quad(p1, p2, p3, p4, col):
-            # p1, p2, p3, p4: (x, y, z)
             vertices.extend([p1[0], p1[1], p1[2], col[0], col[1], col[2]])
             vertices.extend([p2[0], p2[1], p2[2], col[0], col[1], col[2]])
             vertices.extend([p3[0], p3[1], p3[2], col[0], col[1], col[2]])

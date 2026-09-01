@@ -7,6 +7,7 @@ uniform mat4 model;
 
 void main()
 {
+    // Pozycja i rozmiar bąbelka
     gl_Position = projection * view * model * vec4(aPos, 1.0);
-    gl_PointSize = 6.0; // Rozmiar bąbelka na ekranie
+    gl_PointSize = 6.0;
 }

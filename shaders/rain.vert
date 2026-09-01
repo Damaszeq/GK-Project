@@ -1,7 +1,7 @@
 #version 330 core
 
 layout (location = 0) in vec3 aPos;
-layout (location = 1) in float aOffset; // 0.0 for top of drop, 1.0 for bottom
+layout (location = 1) in float aOffset; // 0.0 góra, 1.0 dół
 
 uniform mat4 model;
 uniform mat4 view;
@@ -24,7 +24,7 @@ void main()
     
     vec3 currentPos = vec3(aPos.x, newY, aPos.z);
     
-    // Przesunięcie dolnego końca kropli o wiatr i grawitację
+    // Przesunięcie dolnego końca kropli o "wiatr i grawitację"
     if (aOffset > 0.5) {
         currentPos += windDirection;
     }

@@ -139,7 +139,7 @@ def render_clouds(cloud_shader, cloud_mesh, projection, view, app_time, sky_colo
 def main():
     if not glfw.init():
         raise Exception("GLFW error")
-
+    
     glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
     glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
     glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
@@ -158,6 +158,7 @@ def main():
     glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_DISABLED)
     glfw.set_cursor_pos_callback(window, mouse_callback)
 
+    # Inicjalizacja shaderów
     shader = Shader("shaders/vertex.glsl", "shaders/basic.frag")
     water_shader = Shader("shaders/water.vert", "shaders/water.frag")
     rain_shader = Shader("shaders/rain.vert", "shaders/rain.frag")
@@ -188,6 +189,7 @@ def main():
     glReadBuffer(GL_NONE)
     glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
+    # Wczytanie modeli
     rock_model = Model("models/Obj/stone_largeA.obj")
     plant_model = Model("models/Obj/plant_bush.obj")
     plant2_model = Model("models/Obj/plant_flatTall.obj")
@@ -205,10 +207,12 @@ def main():
     HALF_SIZE = TERRAIN_SIZE / 2.0
     terrain = Terrain("textures/heightmap.png", size=TERRAIN_SIZE, max_height=8.0, min_height=-0.8)
     
+    # Generowanie losowych pozycji modeli
     random.seed(123)
     models_to_draw = []
     
     attempts = 0
+    # Generowanie modeli pod wodą
     while len(models_to_draw) < 400 and attempts < 2000:
         attempts += 1
         x = random.uniform(-25.0, 25.0)
@@ -229,6 +233,8 @@ def main():
                 
     attempts = 0
     nature_placed = 0
+
+    # Generowanie modeli nad wodą
     while attempts < 3000 and nature_placed < 200:
         attempts += 1
         x = random.uniform(-25.0, 25.0)
@@ -254,8 +260,11 @@ def main():
                 
             nature_placed += 1
 
+
+    # Inicjalizacja deszczu
     rain = Rain(num_drops=1500, bounds=(-HALF_SIZE, HALF_SIZE, 0, 40, -HALF_SIZE, HALF_SIZE))
-    
+
+    # Inicjalizacja shaderów wody
     water_shader.use()
     water_shader.set_int("reflectionTexture", 0)
     water_shader.set_int("refractionTexture", 1)
@@ -267,6 +276,7 @@ def main():
     light_direction = glm.normalize(glm.vec3(-0.2, -1.0, -0.1))
     light_color = glm.vec3(0.6, 0.65, 0.7)
 
+    # Generowanie wierzchołków dla powietrza i wody
     water_vertices = [
         -HALF_SIZE, 0.0, -HALF_SIZE,  0.0, 0.0, 0.0,
         -HALF_SIZE, 0.0,  HALF_SIZE,  0.0, 0.0, 0.0,
@@ -288,6 +298,7 @@ def main():
     ]
     cloud_mesh = Mesh(cloud_vertices)
 
+    # Inicjalizacja buforów dla odbicia, załamania i falowania
     reflection_fbo = Framebuffer(WINDOW_WIDTH, WINDOW_HEIGHT)
     refraction_fbo = Framebuffer(WINDOW_WIDTH, WINDOW_HEIGHT)
     ripple_fbo = Framebuffer(512, 512)
@@ -297,6 +308,7 @@ def main():
 
     sky_color = (0.48, 0.52, 0.58, 1.0)
 
+    # Główna pętla renderowania
     while not glfw.window_should_close(window):
         current_time = time.time()
         delta_time = current_time - last_frame_time
@@ -308,7 +320,7 @@ def main():
 
         camera.process_keyboard(window, delta_time)
 
-        # Flaga zanurzenia pod wodą (poziom wody to y = 0.0)
+        # Flaga zanurzenia pod wodą (poziom wody y = 0.0)
         is_underwater = 1.0 if camera.position.y < 0.0 else 0.0
 
         # Aktualizacja pozycji bąbelków
@@ -366,7 +378,7 @@ def main():
         glDepthMask(GL_TRUE)
         glEnable(GL_DEPTH_TEST)
 
-        # PASS 1: Odbicie (Reflection Pass)
+        # PASS 1: Odbicie
         reflection_fbo.bind()
         glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
         glClearColor(*sky_color)
@@ -385,7 +397,7 @@ def main():
         render_scene(shader, terrain, sky_color, is_underwater, app_time)
         render_models(model_shader, projection, view_reflection, camera, sky_color, light_color, light_direction, reflection_plane, models_to_draw, is_underwater, app_time)
 
-        # PASS 2: Załamanie (Refraction Pass)
+        # PASS 2: Załamanie
         refraction_fbo.bind()
         glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
         glClearColor(*sky_color)

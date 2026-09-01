@@ -41,13 +41,13 @@ class BubbleSystem:
 
     def draw(self, shader, projection, view, is_underwater):
         if is_underwater <= 0.0:
-            return # Rysujemy tylko pod wodą!
+            return
 
         shader.use()
         shader.set_mat4("projection", projection)
         shader.set_mat4("view", view)
         
-        # Włączenie obsługi rozmiaru punktów w OpenGL oraz blendingu (przezroczystości)
+        # Obsługa rozmiaru punktów w OpenGL oraz blendingu (przezroczystości)
         GL.glEnable(GL.GL_PROGRAM_POINT_SIZE)
         GL.glEnable(GL.GL_BLEND)
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)

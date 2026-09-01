@@ -3,27 +3,27 @@ import glm
 
 class Shader:
     def __init__(self, vertex_path, fragment_path):
-        # 1. Odczyt kodu shaderów z plików
+        # Odczyt kodu shaderów
         with open(vertex_path, 'r', encoding='utf-8') as f:
             vertex_code = f.read()
         with open(fragment_path, 'r', encoding='utf-8') as f:
             fragment_code = f.read()
 
-        # 2. Kompilacja Vertex Shadera
+        # Kompilacja Vertex Shadera
         vertex_shader = glCreateShader(GL_VERTEX_SHADER)
         glShaderSource(vertex_shader, vertex_code)
         glCompileShader(vertex_shader)
         if not glGetShaderiv(vertex_shader, GL_COMPILE_STATUS):
             raise Exception(f"Błąd kompilacji Vertex Shadera: {glGetShaderInfoLog(vertex_shader).decode()}")
 
-        # 3. Kompilacja Fragment Shadera
+        # Kompilacja Fragment Shadera
         fragment_shader = glCreateShader(GL_FRAGMENT_SHADER)
         glShaderSource(fragment_shader, fragment_code)
         glCompileShader(fragment_shader)
         if not glGetShaderiv(fragment_shader, GL_COMPILE_STATUS):
             raise Exception(f"Błąd kompilacji Fragment Shadera: {glGetShaderInfoLog(fragment_shader).decode()}")
 
-        # 4. Linkowanie programu
+        # Linkowanie programu
         self.program = glCreateProgram()
         glAttachShader(self.program, vertex_shader)
         glAttachShader(self.program, fragment_shader)
@@ -38,6 +38,7 @@ class Shader:
     def use(self):
         glUseProgram(self.program)
 
+    # Settery dla uniformów
     def set_mat4(self, name, value):
         loc = glGetUniformLocation(self.program, name)
         glUniformMatrix4fv(loc, 1, GL_FALSE, glm.value_ptr(value))
@@ -47,7 +48,6 @@ class Shader:
         glUniform3f(location, vector.x, vector.y, vector.z)
 
     def set_vec3_array(self, name: str, array):
-        # Oczekujemy listy trójek, np. [(x, y, z), (x, y, z)]
         import ctypes
         flat_array = [val for vec in array for val in vec]
         c_array = (ctypes.c_float * len(flat_array))(*flat_array)

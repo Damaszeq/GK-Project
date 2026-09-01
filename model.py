@@ -21,8 +21,9 @@ class Model:
         materials = {}
         current_color = (1.0, 1.0, 1.0)
         
-        final_data = [] # will store [px, py, pz, u, v, nx, ny, nz, cr, cg, cb]
-        
+        final_data = [] # [px, py, pz, u, v, nx, ny, nz, cr, cg, cb] (pozycja, UV, normal, kolor)
+
+        # Wczytywanie pliku OBJ
         with open(filepath, 'r') as file:
             for line in file:
                 if line.startswith('mtllib '):
@@ -53,23 +54,23 @@ class Model:
                 elif line.startswith('f '):
                     parts = line.split()[1:]
                     
-                    # Triangulate polygon if it has more than 3 vertices
+                    # Triangulacja wielokątów (jeśli jest więcej niż 3 wierzchołki)
                     for i in range(1, len(parts) - 1):
                         indices = [parts[0], parts[i], parts[i+1]]
                         for vertex_data in indices:
                             v_data = vertex_data.split('/')
                             
-                            # Vertex Position
+                            # pozycja wierzchołka
                             v_idx = int(v_data[0]) - 1
                             pos = temp_vertices[v_idx]
                             
-                            # UV Coordinates
+                            # koordynaty UV
                             uv = (0.0, 0.0)
                             if len(v_data) > 1 and v_data[1] != '':
                                 vt_idx = int(v_data[1]) - 1
                                 uv = temp_uvs[vt_idx]
                                 
-                            # Normals
+                            # normale
                             normal = (0.0, 1.0, 0.0)
                             if len(v_data) > 2 and v_data[2] != '':
                                 vn_idx = int(v_data[2]) - 1
@@ -93,22 +94,22 @@ class Model:
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
         glBufferData(GL_ARRAY_BUFFER, self.vertices.nbytes, self.vertices, GL_STATIC_DRAW)
 
-        # Stride is 11 floats (3 pos, 2 uv, 3 normal, 3 color)
+        # Stride -> 11 floats (3 pozycja, 2 uv, 3 normal, 3 kolor)
         stride = 11 * 4
         
-        # Position attribute
+        # Pozycja wierzchołka
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
         glEnableVertexAttribArray(0)
         
-        # UV attribute
+        # UV 
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(3 * 4))
         glEnableVertexAttribArray(1)
         
-        # Normal attribute
+        # Normal 
         glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(5 * 4))
         glEnableVertexAttribArray(2)
         
-        # Color attribute
+        # Kolor 
         glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(8 * 4))
         glEnableVertexAttribArray(3)
 

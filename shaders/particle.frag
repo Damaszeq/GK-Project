@@ -3,7 +3,7 @@ out vec4 FragColor;
 
 void main()
 {
-    // Nadajemy bąbelkom lekko przezroczysty, jasnoniebieski/biały kolor z okrągłym kształtem
+    // kształt i kolor (lekko przeźroczysty błękitny) bąbelka
     vec2 coord = gl_PointCoord - vec2(0.5);
     if(length(coord) > 0.5)
         discard; // Tworzy okrągły kształt punktu

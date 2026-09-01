@@ -18,7 +18,6 @@ void main() {
     // Wiek kropli na wodzie (od 0.0 do 1.0 sekundy):
     age = (40.0 - newY) / fallSpeed;
     
-    // Z każdym punktem deszczu mamy 2 wierzchołki (aOffset 0 i 1). Rysujemy okrąg tylko raz per kropla.
     // Rysujemy tylko te, które uderzyły niedawno (age < 1.0)
     if (aOffset > 0.5 || age > 1.0 || age < 0.0) {
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // Wyrzucamy poza ekran

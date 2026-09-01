@@ -10,7 +10,7 @@ class Camera:
         
         self.yaw = -90.0
         self.pitch = 0.0
-        self.speed = 12.0  # Zwiększona bazowa prędkość
+        self.speed = 12.0  # bazowa prędkość
         self.sensitivity = 0.1
         self.first_mouse = True
         self.last_x = 640.0
@@ -54,7 +54,7 @@ class Camera:
         if glfw.get_key(window, glfw.KEY_Q) == glfw.PRESS:
             self.position -= self.up * velocity
 
-# --- OGRANICZENIE OBSZARU (Brak możliwości wyjścia poza dno/brzegi jeziora) ---
+    # OGRANICZENIE OBSZARU
         max_radius = 44.0
         xz_pos = glm.vec2(self.position.x, self.position.z)
         distance = glm.length(xz_pos)
@@ -64,9 +64,10 @@ class Camera:
             self.position.x = xz_pos.x
             self.position.z = xz_pos.y
 
-        # Zabezpieczenie przed schodzeniem poniżej dna (podniesione wyżej)
+        # Zabezpieczenie przed schodzeniem poniżej dna
         if self.position.y < -0.67:
             self.position.y = -0.67
+    
     def process_mouse(self, xpos, ypos):
         if self.first_mouse:
             self.last_x = xpos

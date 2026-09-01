@@ -12,11 +12,11 @@ class Framebuffer:
         self.width = width
         self.height = height
 
-        # --- KROK 2.1.1: Utworzenie pojemnika FBO ---
+        # Utworzenie pojemnika FBO
         self.fbo_id = glGenFramebuffers(1)
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
 
-        # --- KROK 2.1.2: Tworzenie i podpinanie Tekstury Koloru ---
+        # Tworzenie i podpinanie Tekstury Koloru 
         self.color_texture = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, self.color_texture)
         
@@ -47,7 +47,7 @@ class Framebuffer:
         # Podpięcie Tekstury jako bufor głębokości
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, self.depth_texture, 0)
 
-        #Walidacja kompletości FBO ---
+        #Walidacja kompletości FBO 
         status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
         if status != GL_FRAMEBUFFER_COMPLETE:
             raise RuntimeError(f"Błąd tworzenia FBO! Status statusu: {status}")
@@ -55,24 +55,18 @@ class Framebuffer:
         # Po skonfigurowaniu odpinamy FBO, wracając do domyślnego bufora
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
+    #Przekierowuje cały proces renderowania do tego wirtualnego bufora.
     def bind(self):
-        """
-        Przekierowuje cały proces renderowania do tego wirtualnego bufora.
-        """
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
         glViewport(0, 0, self.width, self.height)
 
+    #Przywraca renderowanie na fizyczny ekran monitora.
     def unbind(self, screen_width: int, screen_height: int):
-        """
-        Przywraca renderowanie na fizyczny ekran monitora.
-        """
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glViewport(0, 0, screen_width, screen_height)
 
+    #Zwalnia zasoby w pamięci karty graficznej przy zamykaniu programu.
     def clean_up(self):
-        """
-        Zwalnia zasoby w pamięci karty graficznej przy zamykaniu programu.
-        """
         glDeleteFramebuffers(1, [self.fbo_id])
         glDeleteTextures(1, [self.color_texture])
         glDeleteTextures(1, [self.depth_texture])

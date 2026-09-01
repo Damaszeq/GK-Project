@@ -15,7 +15,7 @@ uniform mat4 view;
 uniform mat4 projection;
 uniform vec4 plane;
 
-// Zmniejszona gęstość mgły (wcześniej 0.025)
+// gęstość mgły
 uniform float density = 0.016;
 uniform float gradient = 1.5;
 
