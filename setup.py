@@ -6,7 +6,7 @@ def main():
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "pip"])
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
-        print("\nInstallation complete! You can now run the game using 'python main.py'.")
+        print("\nInstallation complete! You can now run the program using 'python main.py'.")
     except subprocess.CalledProcessError:
         print("\nAn error occurred during installation. Please check the output above.")
     input("Press Enter to continue...")
