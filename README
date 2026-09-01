@@ -1,4 +1,4 @@
-Projekt zakłada: render tafli wody z elementem deszczu (odbicie, refrakcja i efekt Fresnela)
+Projekt zakłada: render tafli wody z elementem deszczu (odbicie, załamanie i efekt Fresnela)
 
 Projekt napisany został w języku Python
 
@@ -17,5 +17,14 @@ STEROWANIE KAMERĄ:
 - Wciśnięcie klawisza `E` powoduje przesunięcie kamery do góry
 - Przytrzymanie klawisza `LSHIFT` powoduje zwiększenie prędkości poruszania się kamery
 - Wciśnięcie klawisza `ESC` powoduje wyjście z programu
+
+Główną koncepcją, którą zakłada ten projekt jest render wody, który to realizowany jest w 3 krokach:
+1. Odbicie - Kamera jest matematycznie "odbijana" pod powierzchnię wody (odwracamy oś Y). Aktywujemy klipowanie (Clip Distance), które obcina całą geometrię znajdującą się pod wodą Wynik renderujemy do ukrytej tekstury (FBO Odbicia)
+2. Załamanie - Używamy zwykłej pozycji kamery, ale tym razem odwracamy klipowanie – renderujemy wyłącznie to, co jest pod powierzchnią wody (dno, podwodne kamienie). Wynik trafia do innej tekstury FBO. Oprócz koloru zapisujemy również specjalny bufor głębokości (Depth Buffer), aby wiedzieć, jak głęboka jest woda w danym pikselu ekranu
+3. Główny render - Renderujemy normalną scenę. Gdy przychodzi czas narysowania tafli wody, Fragment Shader wody (water.frag) pobiera obie tekstury (odbicie i załamanie). Następnie wykorzystuje Efekt Fresnela – w zależności od kąta patrzenia kamery, piksel wody staje się bardziej lustrzany (gdy patrzymy pod ostrym kątem na horyzont) lub bardziej przezroczysty, ukazujący dno (gdy patrzymy prosto w dół)
+
+Dodatkową koncepcją jest render deszczu zrealizowany w następujący sposób:
+Padający deszcz generuje małe fale dyspersyjne na tafli wody. Osiągnięto to poprzez dodatkowy Krok 0, w którym wirtualny system cząsteczkowy deszczu rysuje siłę uderzeń do specjalnej mapy wibracji. Następnie shader wody mapuje tę teksturę, oblicza z niej gradient i fizycznie pochyla wektory normalne tafli, co precyzyjnie wykrzywia odbicie w miejscach uderzeń kropel wody.
+
 
 Projekt stworzony przez Tomasz Wejner i Mikołaj Neldner
